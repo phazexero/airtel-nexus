@@ -1,10 +1,10 @@
 'use client';
 
-import { useStore } from '@/lib/store';
+import { useDb } from '@/lib/db';
 import { APP_USER_ID } from '@/lib/data';
 
 export default function OffersTab({ setTab }) {
-  const { state, dispatch } = useStore();
+  const { state, dispatch } = useDb();
   const offers = state.offers.filter((o) => o.toId === APP_USER_ID);
 
   if (offers.length === 0) {

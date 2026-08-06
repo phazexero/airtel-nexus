@@ -1,0 +1,229 @@
+'use client';
+
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
+
+// ===========================================================================
+//  DATA LAYER
+//
+//  One store behind both apps. It loads asynchronously from /api/data so the
+//  loading states in the UI are real rather than decorative, then persists to
+//  localStorage and broadcasts every change to other open tabs. Open the care
+//  console in one tab and the customer app in another and they stay in step.
+//
+//  For a real deployment this is the layer that gets replaced: swap the
+//  localStorage read and write in load() and persist() for API calls against a
+//  database. Every component reads through useDb(), so nothing above this file
+//  needs to change.
+// ===========================================================================
+
+const KEY = 'nexus.state.v1';
+const CHANNEL = 'nexus.sync';
+
+const DbContext = createContext(null);
+
+const empty = {
+  status: 'loading', // loading | ready | error
+  customers: [],
+  localities: [],
+  products: {},
+  offers: [],
+  intents: [],
+  liveCampaigns: [],
+  activity: [],
+  seq: 1,
+};
+
+function stamp() {
+  return new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'HYDRATE':
+      return { ...state, ...action.payload, status: 'ready' };
+    case 'FAILED':
+      return { ...state, status: 'error' };
+
+    // --- editing ----------------------------------------------------------
+    case 'UPDATE_CUSTOMER':
+      return {
+        ...state,
+        seq: state.seq + 1,
+        customers: state.customers.map((c) => (c.id === action.id ? { ...c, ...action.patch } : c)),
+        activity: [
+          { id: `e${state.seq}`, at: stamp(), surface: 'console', text: `${action.by} edited the profile for ${action.id}.` },
+          ...state.activity,
+        ],
+      };
+    case 'UPDATE_LOCALITY':
+      return {
+        ...state,
+        seq: state.seq + 1,
+        localities: state.localities.map((l) => (l.id === action.id ? { ...l, ...action.patch } : l)),
+        activity: [
+          { id: `e${state.seq}`, at: stamp(), surface: 'console', text: `${action.by} edited area data for ${action.id}.` },
+          ...state.activity,
+        ],
+      };
+    case 'UPDATE_PRODUCT':
+      return {
+        ...state,
+        seq: state.seq + 1,
+        products: { ...state.products, [action.id]: { ...state.products[action.id], ...action.patch } },
+      };
+
+    // --- the cross-surface loop -------------------------------------------
+    case 'PUSH_OFFER':
+      return {
+        ...state,
+        seq: state.seq + 1,
+        offers: [{ id: `o${state.seq}`, at: stamp(), status: 'new', ...action.offer }, ...state.offers],
+        activity: [
+          { id: `a${state.seq}`, at: stamp(), surface: 'console', text: `Offer sent to ${action.offer.to}: ${action.offer.title}` },
+          ...state.activity,
+        ],
+      };
+    case 'RESPOND_OFFER': {
+      const offer = state.offers.find((o) => o.id === action.id);
+      if (!offer) return state;
+      return {
+        ...state,
+        seq: state.seq + 1,
+        offers: state.offers.map((o) => (o.id === action.id ? { ...o, status: action.response } : o)),
+        intents:
+          action.response === 'interested'
+            ? [{ id: `i${state.seq}`, at: stamp(), customer: offer.to, customerId: offer.toId, title: offer.title, note: 'Tapped through from the offer card and stopped on the details screen.' }, ...state.intents]
+            : state.intents,
+        activity: [
+          {
+            id: `a${state.seq}`,
+            at: stamp(),
+            surface: 'app',
+            text:
+              action.response === 'interested'
+                ? `${offer.to} showed interest in ${offer.title}. Hot lead raised on the queue.`
+                : `${offer.to} dismissed ${offer.title}. Suppressed for 30 days.`,
+          },
+          ...state.activity,
+        ],
+      };
+    }
+    case 'ACCEPT_OFFER':
+      return {
+        ...state,
+        seq: state.seq + 1,
+        offers: state.offers.map((o) => (o.id === action.id ? { ...o, status: 'accepted' } : o)),
+        intents: state.intents.filter((i) => i.customerId !== action.customerId),
+        activity: [
+          { id: `a${state.seq}`, at: stamp(), surface: 'app', text: `${action.customer} completed onboarding for ${action.title}.` },
+          ...state.activity,
+        ],
+      };
+    case 'CLEAR_INTENT':
+      return { ...state, intents: state.intents.filter((i) => i.id !== action.id) };
+    case 'LAUNCH_CAMPAIGN':
+      return {
+        ...state,
+        seq: state.seq + 1,
+        liveCampaigns: [{ id: `c${state.seq}`, at: stamp(), ...action.campaign }, ...state.liveCampaigns],
+        activity: [
+          { id: `a${state.seq}`, at: stamp(), surface: 'console', text: `Campaign live in ${action.campaign.area}: ${action.campaign.headline}` },
+          ...state.activity,
+        ],
+      };
+    default:
+      return state;
+  }
+}
+
+export function DbProvider({ children }) {
+  const [state, rawDispatch] = useReducer(reducer, empty);
+  const channel = useRef(null);
+  const echo = useRef(false);
+
+  // --- load -----------------------------------------------------------------
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const cached = typeof window !== 'undefined' ? window.localStorage.getItem(KEY) : null;
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          // Small delay even on the cached path so the skeletons are visible
+          // rather than flashing. Drop this when the data source is real.
+          await new Promise((r) => setTimeout(r, 260));
+          if (!cancelled) rawDispatch({ type: 'HYDRATE', payload: parsed });
+          return;
+        }
+        const res = await fetch('/api/data');
+        if (!res.ok) throw new Error(`seed failed: ${res.status}`);
+        const seed = await res.json();
+        if (!cancelled) rawDispatch({ type: 'HYDRATE', payload: seed });
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) rawDispatch({ type: 'FAILED' });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // --- persist and broadcast ------------------------------------------------
+  useEffect(() => {
+    if (state.status !== 'ready') return;
+    const { status: _drop, ...persistable } = state;
+    try {
+      window.localStorage.setItem(KEY, JSON.stringify(persistable));
+    } catch {
+      /* storage full or blocked; the session still works, it just will not survive a reload */
+    }
+    if (echo.current) {
+      echo.current = false;
+      return;
+    }
+    channel.current?.postMessage(persistable);
+  }, [state]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return undefined;
+    const ch = new BroadcastChannel(CHANNEL);
+    channel.current = ch;
+    ch.onmessage = (e) => {
+      echo.current = true;
+      rawDispatch({ type: 'HYDRATE', payload: e.data });
+    };
+    return () => ch.close();
+  }, []);
+
+  const reset = useCallback(async () => {
+    window.localStorage.removeItem(KEY);
+    const seed = await fetch('/api/data').then((r) => r.json());
+    rawDispatch({ type: 'HYDRATE', payload: seed });
+    channel.current?.postMessage(seed);
+  }, []);
+
+  const value = useMemo(
+    () => ({ state, dispatch: rawDispatch, reset, ready: state.status === 'ready' }),
+    [state, reset]
+  );
+
+  return <DbContext.Provider value={value}>{children}</DbContext.Provider>;
+}
+
+export function useDb() {
+  const ctx = useContext(DbContext);
+  if (!ctx) throw new Error('useDb must be used inside DbProvider');
+  return ctx;
+}
+
+// Convenience selectors so components do not re-implement lookups.
+export function useCustomer(id) {
+  const { state } = useDb();
+  return state.customers.find((c) => c.id === id);
+}
+
+export function useLocality(id) {
+  const { state } = useDb();
+  return state.localities.find((l) => l.id === id);
+}

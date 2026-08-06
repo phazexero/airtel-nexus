@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { LOCALITIES } from '@/lib/data';
 import { buildCampaign, formatINR } from '@/lib/ai';
-import { useStore } from '@/lib/store';
+import { useDb } from '@/lib/db';
+import { useEdit, useSession } from './CareChrome';
+import { EditText, EditNumber, EditList } from '@/components/ui/Editable';
+import { Skel } from '@/components/ui/Skeleton';
 import Count from '@/components/ui/Count';
 
 const OBJECTIVES = [
@@ -23,7 +25,10 @@ function project(loc) {
 }
 
 export default function CampaignStudio() {
-  const { state, dispatch } = useStore();
+  const { state, dispatch } = useDb();
+  const { editing } = useEdit();
+  const user = useSession();
+  const LOCALITIES = state.localities;
   const [areaId, setAreaId] = useState(null);
   const [objective, setObjective] = useState('upsell');
   const [budget, setBudget] = useState(250000);
@@ -36,9 +41,9 @@ export default function CampaignStudio() {
     // Deliberate delay so the demo shows the work being done. Replace with the
     // real await when /api/ai is wired to a model.
     setTimeout(() => {
-      setBrief(buildCampaign(areaId, objective, budget));
+      setBrief(buildCampaign(LOCALITIES.find((l) => l.id === areaId), objective, budget, state.products));
       setBusy(false);
-    }, 650);
+    }, 900);
   }
 
   const selected = LOCALITIES.find((l) => l.id === areaId);
@@ -146,7 +151,7 @@ export default function CampaignStudio() {
       </div>
 
       <div>
-        {!brief && (
+        {!brief && !busy && (
           <div className="empty-studio">
             <span className="ai-tag">Campaign studio</span>
             <h3 style={{ marginTop: 10 }}>
@@ -160,13 +165,45 @@ export default function CampaignStudio() {
           </div>
         )}
 
-        {brief && <Brief brief={brief} onLaunch={() => dispatch({ type: 'LAUNCH_CAMPAIGN', campaign: { area: brief.locality.name, headline: brief.headline } })} launched={state.liveCampaigns.some((c) => c.area === brief.locality.name)} />}
+        {busy && <BriefSkeleton />}
+
+        {brief && !busy && <Brief brief={brief} editing={editing} onEdit={(patch) => { dispatch({ type: 'UPDATE_LOCALITY', id: brief.locality.id, patch, by: user.name }); setBrief(buildCampaign({ ...brief.locality, ...patch }, objective, budget, state.products)); }} onLaunch={() => dispatch({ type: 'LAUNCH_CAMPAIGN', campaign: { area: brief.locality.name, headline: brief.headline } })} launched={state.liveCampaigns.some((c) => c.area === brief.locality.name)} />}
       </div>
     </div>
   );
 }
 
-function Brief({ brief, onLaunch, launched }) {
+function BriefSkeleton() {
+  return (
+    <>
+      <div className="grid-4" style={{ marginBottom: 14 }}>
+        {[0, 1, 2, 3].map((i) => (
+          <div className="stat" key={i}>
+            <Skel w="58%" h={9} />
+            <Skel w="70%" h={26} style={{ margin: '10px 0 8px' }} />
+            <Skel w="84%" h={9} />
+          </div>
+        ))}
+      </div>
+      <div className="creative" style={{ marginBottom: 14 }}>
+        <div className="creative-top" style={{ opacity: 0.5 }}>
+          <Skel w="40%" h={9} style={{ background: 'rgba(255,255,255,0.3)' }} />
+          <Skel w="84%" h={26} style={{ margin: '14px 0 10px', background: 'rgba(255,255,255,0.3)' }} />
+          <Skel w="64%" h={11} style={{ background: 'rgba(255,255,255,0.3)' }} />
+        </div>
+        <div className="creative-body">
+          <Skel w="100%" h={10} />
+          <Skel w="78%" h={10} style={{ marginTop: 8 }} />
+        </div>
+      </div>
+      <p style={{ fontSize: 11.5, color: 'var(--d-text-3)', textAlign: 'center' }}>
+        Reading {'\u2014'} area telemetry, product fit and channel response history.
+      </p>
+    </>
+  );
+}
+
+function Brief({ brief, onLaunch, launched, editing, onEdit }) {
   const { locality: loc, projection: pr, product } = brief;
 
   return (
@@ -243,11 +280,12 @@ function Brief({ brief, onLaunch, launched }) {
             <h3>What the area told us</h3>
             <span className="pill ai">Evidence</span>
           </header>
-          <ul className="reasons">
-            {brief.evidence.map((e) => (
-              <li key={e}>{e}</li>
-            ))}
-          </ul>
+          <EditList
+            items={brief.evidence}
+            editing={editing}
+            onChange={(v) => onEdit({ evidence: v })}
+            addLabel="Add evidence"
+          />
 
           <div className="thinking" style={{ marginTop: 16 }}>
             <span className="c">// how the brief was derived</span>

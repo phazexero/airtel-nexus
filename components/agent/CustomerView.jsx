@@ -4,19 +4,10 @@ import { useEffect, useState } from 'react';
 import { useDb } from '@/lib/db';
 import { SkelQueue, SkelStats, SkelCard, LoadFail } from '@/components/ui/Skeleton';
 import CustomerWorkspace from './CustomerWorkspace';
-import CampaignStudio from './CampaignStudio';
-import Performance from './Performance';
 
-const WS_TABS = [
-  { id: 'customer', label: 'Customer' },
-  { id: 'studio', label: 'Campaign studio' },
-  { id: 'performance', label: 'Performance' },
-];
-
-export default function AgentConsole() {
+export default function CustomerView() {
   const { state, dispatch, reset } = useDb();
   const [activeId, setActiveId] = useState(null);
-  const [ws, setWs] = useState('customer');
 
   // Select the first conversation once the working set arrives, and hold the
   // selection if the operator has already picked one.
@@ -50,10 +41,7 @@ export default function AgentConsole() {
               <button
                 className="btn"
                 style={{ padding: '6px 12px', fontSize: 11.5 }}
-                onClick={() => {
-                  setActiveId(i.customerId);
-                  setWs('customer');
-                }}
+                onClick={() => setActiveId(i.customerId)}
               >
                 Open profile
               </button>
@@ -76,11 +64,8 @@ export default function AgentConsole() {
               <button
                 key={c.id}
                 className="qrow"
-                data-on={c.id === activeId && ws === 'customer'}
-                onClick={() => {
-                  setActiveId(c.id);
-                  setWs('customer');
-                }}
+                data-on={c.id === activeId}
+                onClick={() => setActiveId(c.id)}
               >
                 <div className="qrow-top">
                   <span className="dot" data-p={c.priority} />
@@ -97,14 +82,6 @@ export default function AgentConsole() {
       </aside>
 
       <section className="workspace">
-        <nav className="ws-tabs">
-          {WS_TABS.map((t) => (
-            <button key={t.id} data-on={ws === t.id} onClick={() => setWs(t.id)} disabled={loading}>
-              {t.label}
-            </button>
-          ))}
-        </nav>
-
         <div className="ws-body">
           {failed && <LoadFail onRetry={reset} />}
 
@@ -118,13 +95,7 @@ export default function AgentConsole() {
             </>
           )}
 
-          {state.status === 'ready' && (
-            <>
-              {ws === 'customer' && activeId && <CustomerWorkspace customerId={activeId} />}
-              {ws === 'studio' && <CampaignStudio />}
-              {ws === 'performance' && <Performance />}
-            </>
-          )}
+          {state.status === 'ready' && activeId && <CustomerWorkspace customerId={activeId} />}
         </div>
       </section>
     </div>

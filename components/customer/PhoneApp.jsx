@@ -1,7 +1,8 @@
 'use client';
 
-import { useStore } from '@/lib/store';
-import { APP_USER, RECHARGE_PACKS, customerById, APP_USER_ID } from '@/lib/data';
+import { useDb } from '@/lib/db';
+import { APP_USER, RECHARGE_PACKS, APP_USER_ID } from '@/lib/data';
+import { Skel } from '@/components/ui/Skeleton';
 import OffersTab from './OffersTab';
 import OnboardTab from './OnboardTab';
 
@@ -13,9 +14,10 @@ const TABS = [
   { id: 'help', label: 'Help', icon: '☎' },
 ];
 
-export default function PhoneApp({ tab, setTab }) {
-  const { state } = useStore();
-  const me = customerById(APP_USER_ID);
+export default function PhoneApp({ tab, setTab, session }) {
+  const { state } = useDb();
+  const me = state.customers.find((c) => c.id === APP_USER_ID);
+  const loading = state.status !== 'ready';
   const unread = state.offers.filter((o) => o.toId === APP_USER_ID && o.status === 'new').length;
 
   return (
@@ -27,22 +29,24 @@ export default function PhoneApp({ tab, setTab }) {
 
       <div className="phone-body">
         <div className="app-header">
-          <div className="avatar">{me.initials}</div>
+          <div className="avatar">{me?.initials ?? session?.name?.slice(0, 2).toUpperCase()}</div>
           <div>
-            <h1>{me.name}</h1>
-            <p>{me.phone} · Prepaid</p>
+            <h1>{me?.name ?? session?.name}</h1>
+            <p>{me?.phone ?? session?.number} · Prepaid</p>
           </div>
           <button className="bell" onClick={() => setTab('offers')} aria-label="Open offers">
             ◆{unread > 0 && <span>{unread}</span>}
           </button>
         </div>
 
-        {tab === 'home' && <HomeTab setTab={setTab} unread={unread} />}
-        {tab === 'recharge' && <RechargeTab />}
-        {tab === 'offers' && <OffersTab setTab={setTab} />}
-        {tab === 'onboard' && <OnboardTab setTab={setTab} />}
-        {tab === 'bank' && <BankTab />}
-        {tab === 'help' && <HelpTab />}
+        {loading && <PhoneSkeleton />}
+
+        {!loading && tab === 'home' && <HomeTab setTab={setTab} unread={unread} />}
+        {!loading && tab === 'recharge' && <RechargeTab />}
+        {!loading && tab === 'offers' && <OffersTab setTab={setTab} />}
+        {!loading && tab === 'onboard' && <OnboardTab setTab={setTab} />}
+        {!loading && tab === 'bank' && <BankTab />}
+        {!loading && tab === 'help' && <HelpTab />}
       </div>
 
       <nav className="tabbar">
@@ -58,6 +62,22 @@ export default function PhoneApp({ tab, setTab }) {
         ))}
       </nav>
     </div>
+  );
+}
+
+function PhoneSkeleton() {
+  return (
+    <>
+      <Skel w="100%" h={168} r={24} style={{ marginBottom: 16 }} />
+      <div className="quick-grid">
+        {[0, 1, 2, 3].map((i) => (
+          <Skel key={i} w="100%" h={62} r={16} />
+        ))}
+      </div>
+      <Skel w="42%" h={11} style={{ margin: '22px 0 12px' }} />
+      <Skel w="100%" h={74} r={16} style={{ marginBottom: 10 }} />
+      <Skel w="100%" h={74} r={16} />
+    </>
   );
 }
 

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useStore } from '@/lib/store';
-import { APP_USER_ID, customerById } from '@/lib/data';
+import { useDb } from '@/lib/db';
+import { APP_USER_ID } from '@/lib/data';
 
 // The onboarding claim in the pitch is that a customer who already exists in
 // the system should not be re-onboarded. Everything on this screen is either
@@ -27,9 +27,9 @@ const STEPS = [
 ];
 
 export default function OnboardTab({ setTab }) {
-  const { state, dispatch } = useStore();
+  const { state, dispatch } = useDb();
   const [step, setStep] = useState(1);
-  const me = customerById(APP_USER_ID);
+  const me = state.customers.find((c) => c.id === APP_USER_ID);
 
   const mine = state.offers.filter((o) => o.toId === APP_USER_ID);
   const live = mine.find((o) => o.status === 'interested') ?? mine[0];
@@ -98,7 +98,7 @@ export default function OnboardTab({ setTab }) {
         <div className="tile">
           <h3>On file already</h3>
           <p style={{ marginTop: 8 }}>
-            {me.name} · {me.phone}
+            {me?.name} · {me?.phone}
             <br />
             KYC verified 2021 · Address verified on the fiber survey
           </p>

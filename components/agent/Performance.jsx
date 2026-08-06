@@ -1,7 +1,6 @@
 'use client';
 
-import { useStore } from '@/lib/store';
-import { CUSTOMERS, LOCALITIES } from '@/lib/data';
+import { useDb } from '@/lib/db';
 import { propensity, formatINR } from '@/lib/ai';
 import Count from '@/components/ui/Count';
 
@@ -14,7 +13,9 @@ const BEFORE_AFTER = [
 ];
 
 export default function Performance() {
-  const { state } = useStore();
+  const { state } = useDb();
+  const CUSTOMERS = state.customers;
+  const LOCALITIES = state.localities;
   const avg = Math.round(CUSTOMERS.reduce((s, c) => s + propensity(c), 0) / CUSTOMERS.length);
   const pipeline = LOCALITIES.reduce((s, l) => s + Math.round(l.subscribers * 0.72 * 0.024), 0);
 

@@ -1,68 +1,108 @@
 'use client';
 
 import { useState } from 'react';
-import { useStore } from '@/lib/store';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useDb } from '@/lib/db';
+import ThemeToggle from '@/lib/theme';
+import { LoadFail } from '@/components/ui/Skeleton';
 import PhoneApp from './PhoneApp';
 
-export default function CustomerSurface() {
-  const { state } = useStore();
+export default function CustomerSurface({ session }) {
+  const router = useRouter();
+  const { state, reset } = useDb();
   const [tab, setTab] = useState('home');
+  const [busy, setBusy] = useState(false);
+
+  async function signOut() {
+    setBusy(true);
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ app: 'my' }),
+    });
+    router.replace('/my/login');
+    router.refresh();
+  }
 
   return (
-    <div className="app-stage">
-      <div className="stage-left">
-        <PhoneApp tab={tab} setTab={setTab} />
-      </div>
-
-      <aside className="rail">
-        <span className="eyebrow">What you are looking at</span>
-        <h2>The customer side of the same loop</h2>
-        <p>
-          This is Ananya Sen&rsquo;s app. She is also the first customer in the care queue on the
-          other surface. Send her an offer from the console and it lands here within the same
-          session, on the Offers tab.
-        </p>
-
-        <div style={{ margin: '22px 0 8px' }}>
-          <span className="eyebrow">The demo path</span>
-        </div>
-        <div className="rail-step">
-          <b>1. Open the care console</b>
-          <span>Pick Ananya Sen. The Next Best Action panel reads her four profile parameters.</span>
-        </div>
-        <div className="rail-step">
-          <b>2. Send the offer to her app</b>
-          <span>The console writes the offer with wording shaped to her temperament and language.</span>
-        </div>
-        <div className="rail-step">
-          <b>3. Come back here</b>
-          <span>The offer is waiting on the Offers tab with an unread badge.</span>
-        </div>
-        <div className="rail-step">
-          <b>4. Tap &ldquo;Tell me more&rdquo;</b>
+    <div className="shell">
+      <header className="topbar topbar-my">
+        <Link href="/" className="brand">
+          <span className="brand-mark" aria-hidden="true" />
           <span>
-            That raises a hot lead back on the console queue, which is the signal an agent needs to
-            call while intent is still warm.
+            Airtel One
+            <small>Your account</small>
           </span>
+        </Link>
+        <span className="topbar-note">
+          Signed in as {session?.name}. This session is separate from the care console.
+        </span>
+        <div className="topbar-right">
+          <ThemeToggle scope="my" />
+          <button className="btn ghost" onClick={signOut} disabled={busy}>
+            {busy ? 'Signing out…' : 'Sign out'}
+          </button>
         </div>
-        <div className="rail-step" style={{ borderLeft: 0, paddingBottom: 0 }}>
-          <b>5. Finish onboarding in-app</b>
-          <span>Three steps, no callback, no form. The console sees it complete.</span>
+      </header>
+
+      <div className="app-stage">
+        <div className="stage-left">
+          <PhoneApp tab={tab} setTab={setTab} session={session} />
         </div>
 
-        <div style={{ margin: '26px 0 0' }}>
-          <span className="eyebrow">Session activity</span>
-          <ul className="feed">
-            {state.activity.slice(0, 9).map((a) => (
-              <li key={a.id} data-surface={a.surface}>
-                <time>{a.at}</time>
-                <i>{a.surface}</i>
-                <span>{a.text}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </aside>
+        <aside className="rail">
+          <span className="eyebrow">What you are looking at</span>
+          <h2>The customer side of the same loop</h2>
+          <p>
+            This account is also the first conversation in the care queue. Sign into Nexus Care in
+            another tab, send the recommended offer, and it arrives here without a refresh.
+          </p>
+
+          <div style={{ margin: '24px 0 10px' }}>
+            <span className="eyebrow">The demo path</span>
+          </div>
+          <div className="rail-step">
+            <b>1. Open Nexus Care in a second tab</b>
+            <span>Sign in as the supervisor if you want to edit data while you go.</span>
+          </div>
+          <div className="rail-step">
+            <b>2. Send the recommended offer</b>
+            <span>The console shapes the wording to this customer&rsquo;s temperament and language.</span>
+          </div>
+          <div className="rail-step">
+            <b>3. Watch it land here</b>
+            <span>No refresh needed. The two tabs stay in step.</span>
+          </div>
+          <div className="rail-step">
+            <b>4. Tap &ldquo;Tell me more&rdquo;</b>
+            <span>A hot lead appears on the console queue while intent is still warm.</span>
+          </div>
+          <div className="rail-step" style={{ borderLeft: 0, paddingBottom: 0 }}>
+            <b>5. Finish onboarding here</b>
+            <span>Three steps, existing KYC carried across, and the console sees it complete.</span>
+          </div>
+
+          <div style={{ margin: '26px 0 0' }}>
+            <span className="eyebrow">Session activity</span>
+            {state.status === 'error' ? (
+              <div style={{ marginTop: 12 }}>
+                <LoadFail onRetry={reset} />
+              </div>
+            ) : (
+              <ul className="feed">
+                {state.activity.slice(0, 9).map((a) => (
+                  <li key={a.id} data-surface={a.surface}>
+                    <time>{a.at}</time>
+                    <i>{a.surface}</i>
+                    <span>{a.text}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }
