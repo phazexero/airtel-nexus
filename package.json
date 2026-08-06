@@ -1,0 +1,17 @@
+{
+  "name": "airtel-nexus",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Airtel dual-surface demo: customer app + care console with AI Next Best Action and geocentric campaign studio",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "14.2.35",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}
