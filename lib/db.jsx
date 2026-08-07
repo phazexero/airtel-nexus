@@ -16,7 +16,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useReducer,
 //  needs to change.
 // ===========================================================================
 
-const KEY = 'nexus.state.v1';
+const KEY = 'nexus.state.v2';
 const CHANNEL = 'nexus.sync';
 
 const DbContext = createContext(null);
@@ -28,10 +28,38 @@ const empty = {
   products: {},
   offers: [],
   intents: [],
+  requests: [],
   liveCampaigns: [],
   activity: [],
+  kyc: 'not started',
   seq: 1,
 };
+
+// A cache written by an older build can be missing whole collections. Spreading
+// that over the empty state leaves an app that renders an empty queue forever
+// with no error to explain it, so check the shape before trusting it.
+// Reading storage is its own failure domain. Safari private mode and blocked
+// third-party storage both make this throw, and losing persistence must not
+// take the whole app down with it.
+function readCache() {
+  try {
+    return window.localStorage.getItem(KEY);
+  } catch {
+    return null;
+  }
+}
+
+function usable(payload) {
+  return Boolean(
+    payload &&
+      Array.isArray(payload.customers) &&
+      payload.customers.length &&
+      Array.isArray(payload.localities) &&
+      payload.localities.length &&
+      payload.products &&
+      Object.keys(payload.products).length
+  );
+}
 
 function stamp() {
   return new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -119,6 +147,43 @@ function reducer(state, action) {
           ...state.activity,
         ],
       };
+    // --- customer-initiated, which is the direction that matters ------------
+    // A request raised in the app becomes a lead on the distributor queue. The
+    // customer took the first step, so the console should see it as intent
+    // rather than as a support ticket.
+    case 'RAISE_REQUEST':
+      return {
+        ...state,
+        seq: state.seq + 1,
+        requests: [{ id: `r${state.seq}`, at: stamp(), status: 'raised', ...action.request }, ...state.requests],
+        intents: [
+          {
+            id: `i${state.seq}`,
+            at: stamp(),
+            customer: action.request.from,
+            customerId: action.request.fromId,
+            title: action.request.title,
+            note: action.request.note,
+          },
+          ...state.intents,
+        ],
+        activity: [
+          { id: `a${state.seq}`, at: stamp(), surface: 'app', text: `${action.request.from} requested ${action.request.title}. Raised with customer support.` },
+          ...state.activity,
+        ],
+      };
+
+    case 'KYC_STATUS':
+      return {
+        ...state,
+        seq: state.seq + 1,
+        kyc: action.status,
+        activity:
+          action.status === 'verified'
+            ? [{ id: `a${state.seq}`, at: stamp(), surface: 'app', text: `${action.customer} completed KYC imaging. Postpaid activation cleared.` }, ...state.activity]
+            : state.activity,
+      };
+
     case 'CLEAR_INTENT':
       return { ...state, intents: state.intents.filter((i) => i.id !== action.id) };
     case 'LAUNCH_CAMPAIGN':
@@ -146,14 +211,27 @@ export function DbProvider({ children }) {
     let cancelled = false;
     (async () => {
       try {
-        const cached = typeof window !== 'undefined' ? window.localStorage.getItem(KEY) : null;
+        const cached = typeof window !== 'undefined' ? readCache() : null;
         if (cached) {
-          const parsed = JSON.parse(cached);
-          // Small delay even on the cached path so the skeletons are visible
-          // rather than flashing. Drop this when the data source is real.
-          await new Promise((r) => setTimeout(r, 260));
-          if (!cancelled) rawDispatch({ type: 'HYDRATE', payload: parsed });
-          return;
+          let parsed = null;
+          try {
+            parsed = JSON.parse(cached);
+          } catch {
+            parsed = null;
+          }
+          if (usable(parsed)) {
+            // Small delay even on the cached path so the skeletons are visible
+            // rather than flashing. Drop this when the data source is real.
+            await new Promise((r) => setTimeout(r, 260));
+            if (!cancelled) rawDispatch({ type: 'HYDRATE', payload: parsed });
+            return;
+          }
+          // Unreadable or written by an older build. Drop it and reseed.
+          try {
+            window.localStorage.removeItem(KEY);
+          } catch {
+            /* nothing to do */
+          }
         }
         const res = await fetch('/api/data');
         if (!res.ok) throw new Error(`seed failed: ${res.status}`);
@@ -197,10 +275,22 @@ export function DbProvider({ children }) {
   }, []);
 
   const reset = useCallback(async () => {
-    window.localStorage.removeItem(KEY);
-    const seed = await fetch('/api/data').then((r) => r.json());
-    rawDispatch({ type: 'HYDRATE', payload: seed });
-    channel.current?.postMessage(seed);
+    try {
+      window.localStorage.removeItem(KEY);
+    } catch {
+      /* nothing to do */
+    }
+    try {
+      const res = await fetch('/api/data');
+      if (!res.ok) throw new Error(`reseed failed: ${res.status}`);
+      const seed = await res.json();
+      rawDispatch({ type: 'HYDRATE', payload: seed });
+      channel.current?.postMessage(seed);
+    } catch {
+      // Reset is a user action, so a failure here has to surface rather than
+      // leave the console showing data the user believes they cleared.
+      rawDispatch({ type: 'FAILED' });
+    }
   }, []);
 
   const value = useMemo(

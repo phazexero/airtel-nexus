@@ -10,7 +10,16 @@ export default function Count({ to, duration = 620, format = (n) => n.toLocaleSt
   const raf = useRef();
 
   useEffect(() => {
-    const reduce = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Feature-detected rather than assumed: matchMedia is missing in some
+    // webviews and in any non-browser render, and an unguarded call here would
+    // take the whole card down with it.
+    let reduce = false;
+    try {
+      reduce = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch {
+      reduce = false;
+    }
     if (reduce) {
       setN(to);
       return;

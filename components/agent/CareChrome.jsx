@@ -1,39 +1,33 @@
 'use client';
 
 import { createContext, useContext, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useDb } from '@/lib/db';
 import ThemeToggle from '@/lib/theme';
+import { OPERATORS, DEFAULT_OPERATOR } from '@/lib/operators';
 
-const SessionContext = createContext(null);
+const SessionContext = createContext(DEFAULT_OPERATOR);
 export function useSession() {
   return useContext(SessionContext);
 }
 
-// Edit mode lives at the chrome level so the toggle in the header governs every
-// panel below it, rather than each card carrying its own switch.
+// Edit mode lives at the chrome level so one toggle governs every panel below
+// it, rather than each card carrying its own switch.
 const EditContext = createContext({ editing: false, canEdit: false, setEditing: () => {} });
 export function useEdit() {
   return useContext(EditContext);
 }
 
-export default function CareChrome({ user, children }) {
-  const router = useRouter();
+export default function CareChrome({ children }) {
   const { reset, state } = useDb();
+  const [user, setUser] = useState(DEFAULT_OPERATOR);
   const [editing, setEditing] = useState(false);
-  const [busy, setBusy] = useState(false);
   const canEdit = user.role === 'supervisor';
 
-  async function signOut() {
-    setBusy(true);
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ app: 'care' }),
-    });
-    router.replace('/care/login');
-    router.refresh();
+  function switchOperator(id) {
+    const next = OPERATORS.find((o) => o.id === id) ?? DEFAULT_OPERATOR;
+    setUser(next);
+    if (next.role !== 'supervisor') setEditing(false);
   }
 
   return (
@@ -44,8 +38,8 @@ export default function CareChrome({ user, children }) {
             <Link href="/care" className="brand">
               <span className="brand-mark" aria-hidden="true" />
               <span>
-                Nexus Care
-                <small>Operator console</small>
+                AltCare
+                <small>Distributor console</small>
               </span>
             </Link>
 
@@ -57,6 +51,7 @@ export default function CareChrome({ user, children }) {
 
             <div className="topbar-right">
               <ThemeToggle scope="care" />
+
               {canEdit && (
                 <button
                   className={`btn ${editing ? 'primary' : ''}`}
@@ -66,25 +61,35 @@ export default function CareChrome({ user, children }) {
                   {editing ? 'Done editing' : 'Edit data'}
                 </button>
               )}
-              {editing && (
+              {editing && canEdit && (
                 <button className="btn ghost" onClick={reset}>
                   Reset demo data
                 </button>
               )}
 
-              <div className="who-chip">
-                <span className="avatar" aria-hidden="true">{user.initials}</span>
-                <span>
+              <label className="op-switch">
+                <span className="avatar" aria-hidden="true">
+                  {user.initials}
+                </span>
+                <span className="op-meta">
                   <b>{user.name}</b>
                   <small>
-                    {user.id} · {user.role}
+                    {user.role}
+                    {canEdit ? '' : ' · read only'}
                   </small>
                 </span>
-              </div>
+                <select value={user.id} onChange={(e) => switchOperator(e.target.value)} aria-label="Working as">
+                  {OPERATORS.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name} · {o.role}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-              <button className="btn ghost" onClick={signOut} disabled={busy}>
-                {busy ? 'Signing out…' : 'Sign out'}
-              </button>
+              <Link href="/" className="btn ghost">
+                Both apps
+              </Link>
             </div>
           </header>
 

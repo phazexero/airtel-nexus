@@ -21,7 +21,7 @@ export default function CustomerView() {
   const failed = state.status === 'error';
 
   return (
-    <div className="console">
+    <>
       <aside className="queue">
         <div className="queue-head">
           <span className="eyebrow">Care queue · Kolkata circle</span>
@@ -98,6 +98,6 @@ export default function CustomerView() {
           {state.status === 'ready' && activeId && <CustomerWorkspace customerId={activeId} />}
         </div>
       </section>
-    </div>
+    </>
   );
 }

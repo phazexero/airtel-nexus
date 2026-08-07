@@ -15,6 +15,8 @@ export async function GET() {
     products: PRODUCTS,
     offers: [],
     intents: [],
+    requests: [],
+    kyc: 'not started',
     liveCampaigns: [],
     activity: [
       { id: 'a0', at: '09:02', surface: 'system', text: 'Overnight scoring run finished. 41,208 profiles refreshed.' },

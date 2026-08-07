@@ -1,29 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useDb } from '@/lib/db';
 import ThemeToggle from '@/lib/theme';
+import { ACCOUNT } from '@/lib/operators';
 import { LoadFail } from '@/components/ui/Skeleton';
 import PhoneApp from './PhoneApp';
 
-export default function CustomerSurface({ session }) {
-  const router = useRouter();
+export default function CustomerSurface() {
   const { state, reset } = useDb();
   const [tab, setTab] = useState('home');
-  const [busy, setBusy] = useState(false);
-
-  async function signOut() {
-    setBusy(true);
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ app: 'my' }),
-    });
-    router.replace('/my/login');
-    router.refresh();
-  }
 
   return (
     <div className="shell">
@@ -36,26 +23,26 @@ export default function CustomerSurface({ session }) {
           </span>
         </Link>
         <span className="topbar-note">
-          Signed in as {session?.name}. This session is separate from the care console.
+          {ACCOUNT.name} · {ACCOUNT.number}. The same person sits first in the distributor queue.
         </span>
         <div className="topbar-right">
           <ThemeToggle scope="my" />
-          <button className="btn ghost" onClick={signOut} disabled={busy}>
-            {busy ? 'Signing out…' : 'Sign out'}
-          </button>
+          <Link href="/care" className="btn ghost">
+            Distributor console
+          </Link>
         </div>
       </header>
 
       <div className="app-stage">
         <div className="stage-left">
-          <PhoneApp tab={tab} setTab={setTab} session={session} />
+          <PhoneApp tab={tab} setTab={setTab} />
         </div>
 
         <aside className="rail">
           <span className="eyebrow">What you are looking at</span>
           <h2>The customer side of the same loop</h2>
           <p>
-            This account is also the first conversation in the care queue. Sign into Nexus Care in
+            This account is also the first conversation in the care queue. Sign into AltCare in
             another tab, send the recommended offer, and it arrives here without a refresh.
           </p>
 
@@ -63,8 +50,8 @@ export default function CustomerSurface({ session }) {
             <span className="eyebrow">The demo path</span>
           </div>
           <div className="rail-step">
-            <b>1. Open Nexus Care in a second tab</b>
-            <span>Sign in as the supervisor if you want to edit data while you go.</span>
+            <b>1. Open the distributor console in a second tab</b>
+            <span>Work as the supervisor if you want to edit data while you go.</span>
           </div>
           <div className="rail-step">
             <b>2. Send the recommended offer</b>

@@ -2,12 +2,13 @@
 
 Two independent applications sharing one data layer.
 
-- **Nexus Care** at `/care` — the operator console. Signing in lands on a hub of the three
-  main features; opening one puts them in a sidebar so you can move between them without
-  going back out. Supervisors can edit the underlying data live from inside any feature.
+- **Nexus Care** at `/care` — the distributor console. It opens on a hub of the four main
+  features; opening one puts them in a sidebar so you can move between them without going
+  back out. Supervisors can edit the underlying data live from inside any feature.
+  - `/care/journey` — the five-stage distributor journey, each stage linking into its tool
   - `/care/customer` — queue, customer 360, next best action
   - `/care/campaigns` — geocentric campaign studio
-  - `/care/performance` — what the two features are meant to move
+  - `/care/performance` — what the features are meant to move
 - **Airtel One** at `/my` — the customer app. Recharge, plans, Payments Bank, offers,
   in-app onboarding.
 
@@ -24,25 +25,20 @@ npm run dev
 
 Open http://localhost:3000 and pick an app.
 
-## Demo credentials
+## No sign-in
 
-| App | Sign in with | Notes |
-| --- | --- | --- |
-| Nexus Care | `a.roy@airtel.demo` / `care1234` | Agent. Read only. |
-| Nexus Care | `s.iyer@airtel.demo` / `super1234` | Supervisor. Can edit every record. |
-| Airtel One | `9830104471`, code `481902` | Ananya Sen, first in the care queue. The code is shown on screen. |
+Both apps open straight into the product. The console header has an operator switcher
+instead: **Shalini Iyer (supervisor)** can edit every record, **Arindam Roy (agent)** sees
+the same console read only. Switching accounts drops edit rights immediately, so the
+permission split is still demonstrable without a login step in front of it.
 
-**These are demo logins, not authentication.** The credentials sit in `lib/auth.js` in plain
-text. The session mechanics are already correct — HMAC-signed, httpOnly, sameSite lax,
-eight-hour expiry — but before anything real goes behind this you need a user table, hashed
-passwords, `SESSION_SECRET` as a required env var with no fallback, rate limiting on the
-login route, and a real SMS provider for the OTP. The notes at the top of `lib/auth.js` say
-the same thing next to the code.
+If authentication goes back in, `lib/operators.js` is what a user table replaces, and
+`role` is what an edit gate should read from a session instead of component state.
 
 ## The demo path
 
-1. Sign into **Nexus Care** as the supervisor, in one tab. You land on the feature hub.
-2. Sign into **Airtel One** in a second tab.
+1. Open **Nexus Care** in one tab. You land on the feature hub, working as the supervisor.
+2. Open **Airtel One** in a second tab.
 3. Open **Customer** from the hub, pick Ananya Sen, and send the recommended offer.
 4. Watch it land in the other tab, with no refresh. Tap "Tell me more".
 5. Back on the console, a hot lead is now sitting above the queue.
@@ -51,6 +47,20 @@ the same thing next to the code.
 
 Step 6 is the one worth rehearsing. It is the clearest evidence that the recommendation is
 reasoning over the four profile parameters rather than reciting a fixed script.
+
+## The distributor journey
+
+`/care/journey` holds the five stages from the journey artefact: understand my market,
+prioritise the right leads, engage and convert, grow the business, track and improve. Each
+stage carries what the distributor does, what they are actually asking at that moment, the
+enabler that answers it, and the target it moves.
+
+The stages are not a poster. Each one links straight into the feature that runs it, so the
+journey doubles as the map of the console. Stage one opens the campaign studio, stages two
+through four open the queue and customer 360, stage five opens performance.
+
+The figures on each stage are targets the pitch argues for, not measured results, and the
+page says so.
 
 ## Editing
 
@@ -67,8 +77,7 @@ the header puts everything back to the seed.
 
 Three layers, all real rather than decorative:
 
-- `app/care/loading.jsx` and `app/my/loading.jsx` stream while the server resolves the
-  session and layout.
+- `app/care/loading.jsx` and `app/my/loading.jsx` stream while the route resolves.
 - `DbProvider` fetches `/api/data` and holds `status: 'loading'` until it lands. The seed
   route has a deliberate 700 ms delay so the skeletons are visible.
 - Individual actions have their own busy states: sending an offer, building a campaign
@@ -76,6 +85,34 @@ Three layers, all real rather than decorative:
 
 Failure has a path too. If the seed request fails, both apps show a retry rather than an
 empty screen.
+
+## Tests
+
+```bash
+npm test
+```
+
+59 tests across six files, no watch mode needed:
+
+- `tests/engine.test.jsx` — the decision engine against every customer, every
+  temperament and language combination a supervisor can select, every locality and
+  objective, plus the degenerate cases an edit can create (a zeroed-out area, a cleared
+  number).
+- `tests/flows.test.jsx` — the real journeys: load, edit and watch the script rewrite, send
+  an offer, receive it in the customer app, complete onboarding, and see the hot lead come
+  back on the queue.
+- `tests/resilience.test.jsx` — cached state from an older build, corrupt cache, blocked
+  `localStorage`, missing `matchMedia`, missing `BroadcastChannel`, failed reseed.
+- `tests/layout.test.jsx` — grid structure. The console is the only grid container, and each
+  feature contributes exactly the children its column count expects. A nested grid container
+  is invisible on a laptop and obvious on a monitor, so it gets asserted rather than eyeballed.
+- `tests/api.test.jsx` — both API routes including malformed bodies and unknown ids.
+- `tests/styles.test.jsx` — brace balance, undefined custom properties, classes with no
+  matching rule, and imports of deleted modules.
+
+The setup file fails any test that logs a React warning, which is what catches hydration
+mismatches and missing keys rather than leaving them in the console for someone to notice
+during a demo.
 
 ## Deploy to Vercel
 
@@ -87,8 +124,7 @@ npx vercel          # preview URL
 npx vercel --prod   # permanent URL
 ```
 
-Set `SESSION_SECRET` in the Vercel dashboard. It falls back to a hardcoded value so the
-demo runs without configuration, which is fine for a pitch and not fine for anything else.
+No environment variables are required.
 
 ## Where the AI goes later
 
@@ -109,18 +145,17 @@ genuinely benefit from generation.
 ## Structure
 
 ```
-middleware.js         route guards, one per app
 app/
   page.jsx            landing, picks an app
   care/
     page.jsx          feature hub, the landing page inside the console
-    (workspace)/      the three features, all sharing the sidebar layout
-  my/                 customer app + its login
-  api/auth/           login and logout
+    (workspace)/      the four features, all sharing the sidebar layout
+  my/                 customer app
   api/data/           seed endpoint
   api/ai/             the single seam for a real model
 lib/
-  auth.js             demo users, signed session cookies
+  operators.js        console operators and the customer account
+  journey.js          the five-stage distributor journey
   db.jsx              async load, edits, persistence, cross-tab sync
   data.js             synthetic CRM, telemetry and area data
   ai.js               scoring, next best action, campaign builder
@@ -142,6 +177,21 @@ stored theme before first paint so there is no flash of the wrong one.
 
 The map in the campaign studio stays dark in both themes. It is a display panel rather than
 page chrome, and the pin contrast is tuned for a dark field.
+
+## Layout
+
+`app/care/(workspace)/layout.jsx` owns the only grid. Features contribute children to it and
+never wrap themselves in another `.console`, because a nested grid declares its own columns,
+fills only the first few, and strands the rest as dead space on wide screens.
+
+Rail widths come from `--nav-w` and `--queue-w` on `.console`, so a breakpoint changes two
+custom properties rather than repeating a whole `grid-template-columns`. Above 1500px the
+queue grows with the viewport up to a ceiling and the workspace keeps a readable measure;
+below 1340px the sidebar drops to icons; below 1000px everything stacks.
+
+The content grids use `repeat(auto-fit, minmax(...))` so they size from whatever container
+they land in rather than from a viewport guess. That is what keeps a wrong container width
+from collapsing four stat cards into four vertical strips.
 
 ## Design notes
 

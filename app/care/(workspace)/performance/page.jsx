@@ -1,7 +1,7 @@
 import FeaturePane from '@/components/agent/FeaturePane';
 import Performance from '@/components/agent/Performance';
 
-export const metadata = { title: 'Performance — Nexus Care' };
+export const metadata = { title: 'Performance — AltCare' };
 
 export default function PerformancePage() {
   return (

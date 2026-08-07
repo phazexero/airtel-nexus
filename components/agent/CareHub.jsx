@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useDb } from '@/lib/db';
 import { useSession } from './CareChrome';
@@ -8,6 +9,11 @@ import { Skel } from '@/components/ui/Skeleton';
 import Count from '@/components/ui/Count';
 
 const DETAIL = {
+  '/care/journey': {
+    title: 'Distributor journey',
+    lede: 'The five stages of a distributor\u2019s day, with the part of this console that runs each one. Start here if you want the shape of the whole thing before the detail.',
+    points: ['Five stages, start to close', 'Each stage links into its tool', 'Targets stated as targets'],
+  },
   '/care/customer': {
     title: 'Customer',
     lede: 'The queue, the full profile, and the next best action for whoever is waiting. The recommendation reads four profile parameters and returns both what to offer and how to say it.',
@@ -30,6 +36,16 @@ export default function CareHub() {
   const user = useSession();
   const loading = state.status !== 'ready';
 
+  // Resolved after mount, not during render. This page is prerendered at build
+  // time, so a date computed in render would be frozen at whenever the build
+  // ran and would not match what the browser computes.
+  const [today, setToday] = useState('');
+  useEffect(() => {
+    setToday(
+      new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })
+    );
+  }, []);
+
   const openValue = state.customers.reduce((s, c) => s + c.arpu, 0);
 
   return (
@@ -37,7 +53,8 @@ export default function CareHub() {
       <div className="hub-inner">
         <header className="hub-head">
           <span className="eyebrow">
-            {user.team} · {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+            {user.team}
+            {today ? ` · ${today}` : ''}
           </span>
           <h1>
             Good to see you, {user.name.split(' ')[0]}.

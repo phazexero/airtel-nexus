@@ -1,7 +1,7 @@
 import FeaturePane from '@/components/agent/FeaturePane';
 import CampaignStudio from '@/components/agent/CampaignStudio';
 
-export const metadata = { title: 'Campaign studio — Nexus Care' };
+export const metadata = { title: 'Campaign studio — AltCare' };
 
 export default function CampaignsPage() {
   return (

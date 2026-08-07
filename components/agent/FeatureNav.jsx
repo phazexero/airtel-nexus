@@ -10,6 +10,18 @@ import { useDb } from '@/lib/db';
 
 export const FEATURES = [
   {
+    href: '/care/journey',
+    label: 'Journey',
+    blurb: 'The five stages of the day',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+        <path d="M6 3v13M6 21v-1.5" strokeLinecap="round" />
+        <circle cx="6" cy="18" r="1.9" />
+        <path d="M11 6h6.5a2.5 2.5 0 0 1 0 5H13a2.5 2.5 0 0 0 0 5h5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     href: '/care/customer',
     label: 'Customer',
     blurb: 'Queue, profile and next best action',
@@ -48,6 +60,7 @@ export default function FeatureNav() {
   const { state } = useDb();
 
   const counts = {
+    '/care/journey': 5,
     '/care/customer': state.status === 'ready' ? state.customers.length : null,
     '/care/campaigns': state.status === 'ready' ? state.localities.length : null,
     '/care/performance': state.liveCampaigns.length || null,
