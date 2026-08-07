@@ -3801,3 +3801,401 @@ textarea.edit-input {
     color: var(--ink-3);
     margin: 16px 0 0;
 }
+
+/* ==========================================================================
+   FAMILY BUNDLING
+   The order is deliberate: what the household pays now, who is on what, where
+   the data actually goes, what is duplicated, and only then the offer. Every
+   figure in the recommendation reconciles against something shown above it.
+   ========================================================================== */
+
+.tabbar {
+    grid-template-columns: repeat(6, 1fr);
+}
+
+.tabbar button {
+    font-size: 8.5px;
+}
+
+.fam-total {
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 16px;
+    background: var(--paper);
+    margin-bottom: 12px;
+}
+
+.fam-total strong {
+    display: block;
+    font-size: 32px;
+    font-weight: 780;
+    letter-spacing: -0.045em;
+    margin: 6px 0 14px;
+    font-variant-numeric: tabular-nums;
+}
+
+.fam-split {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.fam-split span {
+    font-size: 10px;
+    color: var(--ink-3);
+    line-height: 1.4;
+}
+
+.fam-split b {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+    margin-bottom: 2px;
+}
+
+.fam-member {
+    display: flex;
+    gap: 11px;
+    align-items: flex-start;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 13px;
+    margin-bottom: 8px;
+    background: var(--paper);
+}
+
+.fam-member .avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 11px;
+}
+
+.fam-member-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.fam-member-top {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.fam-member-top b {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.fam-member-top .mono {
+    margin-left: auto;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.fam-member-body small {
+    display: block;
+    font-size: 10.5px;
+    color: var(--ink-3);
+    margin-top: 2px;
+}
+
+.fam-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+}
+
+.fam-meta span {
+    font-size: 9.5px;
+    font-weight: 600;
+    color: var(--ink-3);
+    background: var(--canvas);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 2px 8px;
+}
+
+.fam-meta .fam-warn {
+    color: var(--red);
+    background: var(--red-wash);
+    border-color: var(--red-edge);
+}
+
+.fam-bar {
+    display: flex;
+    height: 10px;
+    border-radius: 999px;
+    overflow: hidden;
+    gap: 2px;
+    margin-bottom: 14px;
+}
+
+.fam-bar i {
+    display: block;
+    height: 100%;
+}
+
+[data-cat='Video'] {
+    background: var(--red);
+}
+
+[data-cat='Social'] {
+    background: #ff6b6b;
+}
+
+[data-cat='Gaming'] {
+    background: #ff9d9d;
+}
+
+[data-cat='Browsing'] {
+    background: var(--ink-3);
+}
+
+[data-cat='Work'] {
+    background: #8f9099;
+}
+
+[data-cat='Music'] {
+    background: #c2c4cb;
+}
+
+[data-cat='Messaging'] {
+    background: var(--line-2);
+}
+
+.fam-cats {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.fam-cats li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--ink-2);
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.fam-cats li:last-child {
+    border-bottom: 0;
+}
+
+.fam-cats li i {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex: none;
+}
+
+.fam-cats li b {
+    margin-left: auto;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.fam-cats li small {
+    font-size: 10px;
+    color: var(--ink-3);
+    min-width: 46px;
+    text-align: right;
+}
+
+.fam-privacy {
+    margin: 12px 0 0;
+    font-size: 10px;
+    line-height: 1.6;
+    color: var(--ink-3);
+}
+
+.fam-apps {
+    list-style: none;
+    margin: 9px 0 0;
+    padding: 0;
+}
+
+.fam-apps li {
+    display: flex;
+    font-size: 11.5px;
+    color: var(--ink-2);
+    padding: 5px 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.fam-apps li:last-child {
+    border-bottom: 0;
+}
+
+.fam-apps li b {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+}
+
+.fam-rec {
+    border: 1px solid var(--red-edge);
+    border-radius: var(--r);
+    overflow: hidden;
+    margin-bottom: 12px;
+    background: var(--paper);
+    box-shadow: 0 14px 34px -26px rgba(228, 0, 0, 0.9);
+}
+
+.fam-rec-top {
+    position: relative;
+    overflow: hidden;
+    padding: 20px 17px;
+    background: linear-gradient(150deg, var(--red) 0%, #8f0000 100%);
+    color: #fff;
+}
+
+.fam-rec-top::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(300px 130px at 88% -30%, rgba(255, 255, 255, 0.3), transparent 70%);
+}
+
+.fam-rec-top .eyebrow {
+    color: rgba(255, 255, 255, 0.72);
+    position: relative;
+}
+
+.fam-rec-top h3 {
+    margin: 8px 0 12px;
+    font-size: 21px;
+    font-weight: 780;
+    letter-spacing: -0.04em;
+    position: relative;
+}
+
+.fam-price {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    position: relative;
+}
+
+.fam-price strong {
+    font-size: 30px;
+    font-weight: 780;
+    letter-spacing: -0.045em;
+}
+
+.fam-price em {
+    font-style: normal;
+    font-size: 11.5px;
+    opacity: 0.85;
+}
+
+.fam-saving {
+    position: relative;
+    margin-top: 14px;
+    font-size: 12px;
+    line-height: 1.5;
+    background: rgba(0, 0, 0, 0.22);
+    border-radius: var(--r-xs);
+    padding: 9px 12px;
+}
+
+.fam-saving b {
+    font-size: 14px;
+    font-weight: 750;
+}
+
+.fam-rec-body {
+    padding: 17px;
+}
+
+.fam-includes ul,
+.fam-swap ul {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+}
+
+.fam-includes li {
+    font-size: 11.5px;
+    color: var(--ink-2);
+    line-height: 1.55;
+    padding: 5px 0 5px 16px;
+    position: relative;
+}
+
+.fam-includes li::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 12px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--red);
+}
+
+.fam-ott {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin: 12px 0 18px;
+}
+
+.fam-ott span {
+    font-size: 9.5px;
+    font-weight: 650;
+    color: var(--ink-2);
+    background: var(--canvas);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 3px 9px;
+}
+
+.fam-swap {
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+}
+
+.fam-swap li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--ink-3);
+    padding: 5px 0;
+}
+
+.fam-swap li s {
+    text-decoration-color: var(--red);
+}
+
+.fam-swap li b {
+    margin-left: auto;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.fam-caveat {
+    margin: 12px 0 0;
+    font-size: 10.5px;
+    line-height: 1.6;
+    color: var(--ink-3);
+    border-left: 2px solid var(--line);
+    padding-left: 10px;
+}
+
+.fam-why {
+    padding: 16px 0 18px;
+    border-top: 1px solid var(--line);
+    margin-top: 16px;
+}
+
+.fam-why .reasons li {
+    font-size: 11.5px;
+    color: var(--ink-2);
+    max-width: none;
+}

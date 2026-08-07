@@ -4,11 +4,13 @@ import { useDb } from '@/lib/db';
 import { APP_USER, RECHARGE_PACKS, APP_USER_ID } from '@/lib/data';
 import { Skel } from '@/components/ui/Skeleton';
 import OffersTab from './OffersTab';
-import KycFlow from './KycFlow.jsx';
+import KycFlow from './KycFlow';
+import FamilyTab from './FamilyTab';
 import OnboardTab from './OnboardTab';
 
 const TABS = [
   { id: 'home', label: 'Home', icon: '⌂' },
+  { id: 'family', label: 'Family', icon: '⚭' },
   { id: 'recharge', label: 'Recharge', icon: '↻' },
   { id: 'offers', label: 'Offers', icon: '◆' },
   { id: 'bank', label: 'Money', icon: '₹' },
@@ -45,6 +47,7 @@ export default function PhoneApp({ tab, setTab }) {
         {!loading && tab === 'home' && <HomeTab setTab={setTab} unread={unread} me={me} />}
         {!loading && tab === 'recharge' && <RechargeTab />}
         {!loading && tab === 'offers' && <OffersTab setTab={setTab} />}
+        {!loading && tab === 'family' && <FamilyTab setTab={setTab} />}
         {!loading && tab === 'kyc' && <KycFlow setTab={setTab} />}
         {!loading && tab === 'onboard' && <OnboardTab setTab={setTab} />}
         {!loading && tab === 'bank' && <BankTab />}
@@ -186,6 +189,21 @@ function HomeTab({ setTab, unread, me }) {
               Request a broadband connection
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Third response to the same problem: the household, not the line. */}
+      <div className="alert-card">
+        <span className="alert-icon" aria-hidden="true">⚭</span>
+        <div className="alert-body">
+          <h3>Bundle the whole household</h3>
+          <p>
+            Four lines, four payment dates and five subscriptions between you. There is a version of
+            this that costs less and arrives on one bill.
+          </p>
+          <button className="btn block" onClick={() => setTab('family')}>
+            See the household bundle
+          </button>
         </div>
       </div>
 
