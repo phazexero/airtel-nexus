@@ -9,7 +9,7 @@ import Count from '@/components/ui/Count';
 const KEY = 'nexus.state.v2';
 
 const shell = (ui) => render(<DbProvider><CareChrome>{ui}</CareChrome></DbProvider>);
-const loaded = () => screen.findByRole('heading', { name: 'Ananya Sen', level: 2 }, { timeout: 4000 });
+const loaded = () => screen.findByRole('heading', { name: 'Sanyam Gupta', level: 2 }, { timeout: 4000 });
 
 describe('bad cached state', () => {
   it('reseeds when the cache was written by an older build', async () => {
@@ -108,5 +108,25 @@ describe('reset', () => {
     globalThis.__SEED_FAILS__ = true;
     await user.click(screen.getByRole('button', { name: 'Reset demo data' }));
     expect(await screen.findByText(/Could not load the working set/)).toBeInTheDocument();
+  });
+});
+
+describe('a cache from an earlier build', () => {
+  it('is discarded when the seed data has changed underneath it', async () => {
+    // The exact failure this guards: a browser that ran a previous build holds
+    // a structurally perfect working set full of people who no longer exist.
+    const stale = {
+      dataVersion: 'an-older-build',
+      customers: [{ id: 'C-88214', name: 'Someone Removed', initials: 'SR', phone: '000', locality: 'new-town-aa1', tenure: 1, plan: 'x', planType: 'prepaid', arpu: 1, holds: [], reason: 'x', channel: 'x', waiting: '00:00', priority: 'low', profile: { pastExperience: 'good', pastExperienceNote: '', temperament: 'warm', temperamentNote: '', communication: 'high', communicationNote: '', language: 'English', languageNote: '', bestTime: '' }, signals: [] }],
+      localities: [{ id: 'new-town-aa1', name: 'x', pin: '1', subscribers: 1, arpu: 1, prepaidShare: 1, fiberPenetration: 1, churnRisk: 'low', savingsIndex: 1, segment: 'x', need: 'x', product: 'black', evidence: [] }],
+      products: { black: { id: 'black', name: 'x', price: 1, unit: '/mo', blurb: 'x', margin: 'high' } },
+      offers: [], intents: [], requests: [], liveCampaigns: [], activity: [], seq: 1,
+    };
+    window.localStorage.setItem(KEY, JSON.stringify(stale));
+
+    shell(<CustomerView />);
+    expect(await loaded()).toBeInTheDocument();
+    expect(screen.queryByText('Someone Removed')).not.toBeInTheDocument();
+    expect(screen.getByText(/6 waiting/)).toBeInTheDocument();
   });
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
+import { DATA_VERSION } from './data';
 
 // ===========================================================================
 //  DATA LAYER
@@ -23,12 +24,19 @@ const DbContext = createContext(null);
 
 const empty = {
   status: 'loading', // loading | ready | error
+  dataVersion: DATA_VERSION,
   customers: [],
   localities: [],
   products: {},
   offers: [],
   intents: [],
   requests: [],
+  services: { fiber: true, unlimitedFiber: false },
+  // Autopay has failed and the grace window is running. This is the state the
+  // app opens in, because the film opens on it.
+  safeguard: { active: true, daysLeft: 4, reason: 'Autopay failed' },
+  vacation: null,
+  nba: { status: 'waiting' }, // waiting | upgraded
   liveCampaigns: [],
   activity: [],
   kyc: 'not started',
@@ -52,6 +60,9 @@ function readCache() {
 function usable(payload) {
   return Boolean(
     payload &&
+      // Written by the same seed we are running. A cache from an older build
+      // can be structurally perfect and still hold people who no longer exist.
+      payload.dataVersion === DATA_VERSION &&
       Array.isArray(payload.customers) &&
       payload.customers.length &&
       Array.isArray(payload.localities) &&
@@ -163,12 +174,67 @@ function reducer(state, action) {
             customer: action.request.from,
             customerId: action.request.fromId,
             title: action.request.title,
+            score: action.request.score ?? 79,
             note: action.request.note,
           },
           ...state.intents,
         ],
         activity: [
           { id: `a${state.seq}`, at: stamp(), surface: 'app', text: `${action.request.from} requested ${action.request.title}. Raised with customer support.` },
+          ...state.activity,
+        ],
+      };
+
+    case 'SAFEGUARD_SETTLE':
+      return {
+        ...state,
+        seq: state.seq + 1,
+        safeguard: { ...state.safeguard, active: false, daysLeft: 0 },
+        activity: [
+          { id: `a${state.seq}`, at: stamp(), surface: 'app', text: 'Bundle settled inside the SafeGuard window. No service was interrupted.' },
+          ...state.activity,
+        ],
+      };
+
+    // One tap, no confirmation screen. The offer already carries the reason it
+    // was made, so a second screen asking "are you sure" would only add doubt.
+    case 'NBA_UPGRADE':
+      return {
+        ...state,
+        seq: state.seq + 1,
+        nba: { status: 'upgraded' },
+        services: { ...state.services, unlimitedFiber: true },
+        activity: [
+          { id: `a${state.seq}`, at: stamp(), surface: 'app', text: 'Unlimited Fiber upgrade accepted from the in-app recommendation. One tap, no agent touch.' },
+          ...state.activity,
+        ],
+      };
+
+    // Pausing billing is retention, so the console sees it. A customer who
+    // pauses is a customer who did not cancel.
+    case 'SCHEDULE_VACATION':
+      return {
+        ...state,
+        seq: state.seq + 1,
+        vacation: { id: `v${state.seq}`, at: stamp(), ...action.vacation },
+        activity: [
+          {
+            id: `a${state.seq}`,
+            at: stamp(),
+            surface: 'app',
+            text: `${action.customer} scheduled a ${action.vacation.days} day Vacation Shield break. Billing paused, connection retained.`,
+          },
+          ...state.activity,
+        ],
+      };
+
+    case 'CANCEL_VACATION':
+      return {
+        ...state,
+        seq: state.seq + 1,
+        vacation: null,
+        activity: [
+          { id: `a${state.seq}`, at: stamp(), surface: 'app', text: `${action.customer} resumed early from a Vacation Shield break.` },
           ...state.activity,
         ],
       };

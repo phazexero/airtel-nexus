@@ -2,7 +2,7 @@
 
 Two independent applications sharing one data layer.
 
-- **Nexus Care** at `/care` — the distributor console. It opens on a hub of the four main
+- **AltCare** at `/care` — the distributor console. It opens on a hub of the four main
   features; opening one puts them in a sidebar so you can move between them without going
   back out. Supervisors can edit the underlying data live from inside any feature.
   - `/care/journey` — the five-stage distributor journey, each stage linking into its tool
@@ -37,9 +37,9 @@ If authentication goes back in, `lib/operators.js` is what a user table replaces
 
 ## The demo path
 
-1. Open **Nexus Care** in one tab. You land on the feature hub, working as the supervisor.
+1. Open **AltCare** in one tab. You land on the feature hub, working as the supervisor.
 2. Open **Airtel One** in a second tab.
-3. Open **Customer** from the hub, pick Ananya Sen, and send the recommended offer.
+3. Open **Customer** from the hub, pick Sanyam Gupta, and send the recommended offer.
 4. Watch it land in the other tab, with no refresh. Tap "Tell me more".
 5. Back on the console, a hot lead is now sitting above the queue.
 6. Turn on **Edit data** and change her temperament from analytical to frustrated. The
@@ -92,7 +92,7 @@ empty screen.
 npm test
 ```
 
-59 tests across six files, no watch mode needed:
+103 tests across ten files, no watch mode needed:
 
 - `tests/engine.test.jsx` — the decision engine against every customer, every
   temperament and language combination a supervisor can select, every locality and
@@ -103,6 +103,17 @@ npm test
   back on the queue.
 - `tests/resilience.test.jsx` — cached state from an older build, corrupt cache, blocked
   `localStorage`, missing `matchMedia`, missing `BroadcastChannel`, failed reseed.
+- `tests/customer-actions.test.jsx` — the exhaustion panel and the two alerts under it: the
+  KYC imaging flow including a retake, the broadband request and the exact confirmation
+  wording, and the request arriving on the distributor queue as a lead.
+- `tests/family.test.jsx` — the household arithmetic and the family section. The saving is
+  asserted as an identity against the bundle price and what is kept, not against a hardcoded
+  figure, so the numbers stay checkable when the household data changes.
+- `tests/vacation.test.jsx` — the Vacation Shield entry point, the locked fiber row, the
+  saving calculation, the 90 day limit, scheduling, and resuming early.
+- `tests/script-features.test.jsx` — the beats the launch film shoots: the SafeGuard banner
+  and its wording, the self-arriving NBA push, the one-tap upgrade, the absence of an account
+  name on either card, the phone stage with no rail, and the propensity score on the portal.
 - `tests/layout.test.jsx` — grid structure. The console is the only grid container, and each
   feature contributes exactly the children its column count expects. A nested grid container
   is invisible on a laptop and obvious on a monitor, so it gets asserted rather than eyeballed.
@@ -177,6 +188,108 @@ stored theme before first paint so there is no flash of the wrong one.
 
 The map in the campaign studio stays dark in both themes. It is a display panel rather than
 page chrome, and the pin contrast is tuned for a dark field.
+
+## The customer app home screen
+
+The home screen states the exhaustion first and then offers two responses to it, in that
+order, because an offer only makes sense once the number behind it is on screen.
+
+1. **Data this cycle** — 41.6 GB of 42 GB used, when it ran out, and what the top-ups cost.
+2. **Switch to postpaid for unlimited data** — opens the KYC imaging flow. Three captures
+   (ID front, ID back, live photo), each with a quality gate and a retake path, then
+   verification. Capture is simulated; the camera integration point is marked in
+   `components/customer/KycFlow.jsx`. The awkward part of KYC is not the camera, it is what
+   happens when an image fails, which is why the retake path is built rather than implied.
+3. **Bundle the whole household** — opens the Family section.
+4. **Get a broadband connection** — raises a request and says so plainly: *We have raised a
+   request for this to customer support*, with a reference and a timestamp. It does not
+   pretend to provision anything, because that is not what this path does.
+
+## One account
+
+The app is Sanyam Gupta's account and only his. Pragya's and Debshishu's lines sit under it
+rather than being accounts of their own, which is what makes a single SafeGuard window, a
+single bill and a single bundle coherent. `ACCOUNT_OWNER` in `lib/family.js` is the one
+place the owner is named.
+
+His own line is the one still outside the bundle. That is deliberate: it is what the Family
+recommendation exists to fix, and it is why the postpaid and KYC path on the home screen
+still has something to do.
+
+## Family bundling
+
+`components/customer/FamilyTab.jsx`, reached from the Family tab or the household alert on
+home. It runs in a fixed order, and the order is the argument:
+
+1. **Combined every month** — one number, split across mobile lines, home broadband and
+   subscriptions.
+2. **Who is on what** — four members, four plans, four payment dates, with the top-up leak
+   flagged on the line that has it.
+3. **Where your data goes** — category shares and top apps across the household, read on the
+   device. Only category totals are used, and the screen says so, because a household that
+   is being told their app usage picked this offer will ask.
+4. **What you are paying twice for** — two Netflix subscriptions in one house, found by
+   `duplicateSubs()` rather than asserted.
+5. **The recommendation** — the bundle price, the saving, every OTT app included, and the
+   list of subscriptions it replaces.
+
+Every figure reconciles against something shown above it, which is the point. `lib/family.js`
+computes the saving as `current total − (bundle price + what you still pay for separately)`,
+and the one subscription the bundle does not cover is named rather than quietly dropped. A
+saving that survives being checked against real bills is worth more than a bigger one that
+does not.
+
+The recommendation is rules-derived like everything else here, with the AI integration point
+marked in `recommendBundle()`. A model should choose the wording, never the arithmetic.
+
+Moving the household to the bundle raises a request that lands on the distributor queue as a
+hot lead. The broadband request also lands on the distributor queue as a hot lead, so the loop runs in
+both directions: the console pushes offers to the app, and the app pushes intent back.
+
+## Vacation Shield
+
+`components/customer/VacationCare.jsx`, reached from a small card inside the Money tab.
+Pauses billing on the home connection and the mobile pack for a set of dates.
+
+It is a retention feature dressed as a convenience. The churn it prevents is the customer
+who cancels before a long trip and never comes back, so the screen is built around removing
+the reasons to cancel: the number stays, the plan stays, there is no reconnection charge,
+and the saving is stated before they commit rather than after.
+
+Two decisions worth knowing. The fiber row is shown but disabled until a connection exists
+on the account, because a pause-only feature would be dead on a prepaid-only account and
+hiding it entirely would waste the discovery. And the break is capped at 90 days a year with
+the limit stated in the error, not enforced silently.
+
+The console records the pause as retention rather than raising a lead. A customer who paused
+is a customer who did not cancel, and putting them on a sales queue is the wrong response.
+
+## Built for the launch film
+
+Three surfaces exist because the film shows them full-frame, and each is written so the
+words on screen match the words in the script.
+
+**SafeGuard Grace-Day Shield** (`components/customer/SafeGuard.jsx`). A failed autopay on a
+bundle is the worst kind of failed payment: one declined card takes down broadband, OTT and
+two lines at once. That is the objection to bundling, so SafeGuard is the answer to it and
+appears above everything else on the home screen when it fires. The window is flat: everything
+bundled gets the same four days, whether that is one service or ten, because a customer
+should not have to work out their own grace period.
+
+**The next best action push** (`components/customer/NbaPush.jsx`). Carries exactly two things,
+the trigger that produced it and one action, and arrives on its own rather than waiting for
+an agent, because the claim is that the system noticed first. The arrival animates on mount
+so the moment can be filmed on demand instead of waited for.
+
+**Vacation Shield** one-tap. The full date picker is still underneath, but the common case is
+a single button producing the exact confirmation the script needs.
+
+Neither the SafeGuard banner nor the NBA card shows an account name. The film shoots two
+characters' phones on one device, and a name on either card would break continuity in a
+full-frame capture.
+
+The customer app renders without the explainer rail, so the phone fills the stage cleanly for
+screen capture.
 
 ## Layout
 
