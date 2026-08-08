@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { nextBestAction, buildCampaign } from '@/lib/ai';
-import { customerById } from '@/lib/data';
+import { customerById, LOCALITIES } from '@/lib/data';
 
 // ===========================================================================
 //  The single seam for a real model.
@@ -61,9 +61,22 @@ export async function POST(request) {
   }
 
   if (task === 'campaign') {
+    // An unknown id used to reach buildCampaign and throw somewhere inside it,
+    // which surfaced as a 500 with no explanation. Areas get renamed; the route
+    // should say so rather than fall over.
+    const locality = LOCALITIES.find((l) => l.id === body.localityId);
+    if (!locality) {
+      return NextResponse.json(
+        {
+          error: `No locality with id ${body.localityId}.`,
+          known: LOCALITIES.map((l) => l.id),
+        },
+        { status: 404 }
+      );
+    }
     const remote = await callModel(body);
     return NextResponse.json(
-      remote ?? buildCampaign(body.localityId, body.objective ?? 'upsell', body.budget ?? 250000)
+      remote ?? buildCampaign(locality, body.objective ?? 'upsell', body.budget ?? 250000)
     );
   }
 

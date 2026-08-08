@@ -1,7 +1,17 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { buildCampaign, formatINR, marketingDirections, areaBrief, opportunityBand } from '@/lib/ai';
+import {
+  buildCampaign,
+  formatINR,
+  marketingDirections,
+  areaBrief,
+  allProspects,
+  bestLine,
+  growthProspect,
+  PRODUCT_LINES,
+  PROSPECT_BANDS,
+} from '@/lib/ai';
 import { POPULATION_TYPES } from '@/lib/data';
 import AreaMap from './AreaMap';
 import { useDb } from '@/lib/db';
@@ -16,13 +26,7 @@ const OBJECTIVES = [
   { id: 'retention', label: 'Retain' },
 ];
 
-const MODES = [
-  { id: 'population', label: 'Population type' },
-  { id: 'opportunity', label: 'Opportunity' },
-];
 
-const OPPORTUNITY_FILL = ['#4a2020', '#8a1c1c', '#cc1616', '#ff2e2e'];
-const BAND_LABELS = ['Watch', 'Worth a look', 'Strong', 'Priority'];
 
 export default function CampaignStudio() {
   const { state, dispatch } = useDb();
@@ -31,7 +35,6 @@ export default function CampaignStudio() {
   const LOCALITIES = state.localities;
 
   const [areaId, setAreaId] = useState(null);
-  const [mode, setMode] = useState('population');
   const [objective, setObjective] = useState('upsell');
   const [budget, setBudget] = useState(250000);
   const [direction, setDirection] = useState(null);
@@ -56,10 +59,7 @@ export default function CampaignStudio() {
     }, 900);
   }
 
-  const legend =
-    mode === 'population'
-      ? Object.entries(POPULATION_TYPES).map(([id, t]) => ({ id, label: t.label, colour: t.colour }))
-      : OPPORTUNITY_FILL.map((colour, i) => ({ id: `band-${i}`, colour, label: BAND_LABELS[i] }));
+  const legend = Object.values(PRODUCT_LINES);
 
   return (
     <>
@@ -70,26 +70,16 @@ export default function CampaignStudio() {
             <span className="eyebrow">Around IIFT Kolkata · Madurdaha</span>
             <h3>{LOCALITIES.length} micro-markets within 6 km</h3>
           </div>
-          <div className="seg geo-mode">
-            {MODES.map((m) => (
-              <button key={m.id} data-on={mode === m.id} onClick={() => setMode(m.id)}>
-                {m.label}
-              </button>
-            ))}
-          </div>
+          <span className="geo-hint">Colour is the line worth working. Size is the subscriber base.</span>
         </div>
 
-        <AreaMap
-          localities={LOCALITIES}
-          mode={mode}
-          selectedId={areaId}
-          onSelect={pickArea}
-        />
+        <AreaMap localities={LOCALITIES} selectedId={areaId} onSelect={pickArea} />
 
         <div className="geo-legend">
+          <em>Best growth prospect</em>
           {legend.map((k) => (
-            <span key={k.id}>
-              <i style={{ background: k.colour }} />
+            <span key={k.id} title={k.note}>
+              <i style={{ background: k.hue }} />
               {k.label}
             </span>
           ))}
@@ -113,6 +103,7 @@ export default function CampaignStudio() {
           <div className="card">
             <header>
               <h3>{selected.name}</h3>
+              <span className="pill">{POPULATION_TYPES[selected.population]?.label}</span>
               <span className="pill">{selected.pin}</span>
             </header>
             <ul className="area-mini">
@@ -120,18 +111,24 @@ export default function CampaignStudio() {
                 <li key={line}>{line}</li>
               ))}
             </ul>
-            <div className="area-tags">
-              <span className="pill">
-                <i
-                  className="dotc"
-                  style={{ background: POPULATION_TYPES[selected.population]?.colour }}
-                />
-                {POPULATION_TYPES[selected.population]?.label}
-              </span>
-              <span className="pill">
-                {opportunityBand(selected).label} · {opportunityBand(selected).score}
-              </span>
-              <span className="pill">{selected.churnRisk} churn</span>
+            {/* All three lines at once. Reading them side by side is the point:
+                the best line for an area is rarely the one you arrived to sell. */}
+            <div className="prospects">
+              <span className="eyebrow">Growth prospect</span>
+              {allProspects(selected).map((p) => (
+                <div className="prospect" key={p.line} data-on={bestLine(selected).line === p.line}>
+                  <b>{PRODUCT_LINES[p.line].label}</b>
+                  <span className="prospect-bar">
+                    <i style={{ width: `${p.score}%`, background: PRODUCT_LINES[p.line].hue }} />
+                  </span>
+                  <em>{p.score}</em>
+                  <small>{p.label}</small>
+                </div>
+              ))}
+              <p className="prospect-best">
+                This circle is <b>{PRODUCT_LINES[bestLine(selected).line].label}</b> coloured because
+                that is the strongest of the three here, at {bestLine(selected).score}.
+              </p>
             </div>
 
             {editing && (

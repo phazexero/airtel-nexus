@@ -22,6 +22,11 @@ function console_(ui) {
 
 const ready = () => waitFor(() => expect(screen.queryByText(/Loading the working set/)).not.toBeInTheDocument(), { timeout: 4000 });
 
+// The queue clearing and the workspace painting are not the same moment, and
+// React 19 schedules them further apart than React 18 did. Anything that needs
+// the customer panel should wait for the panel, not for the loader to go.
+const workspaceReady = () => screen.findByRole('heading', { name: 'Sanyam Gupta' }, { timeout: 4000 });
+
 describe('console shell', () => {
   it('loads the working set and lands on the first conversation', async () => {
     console_(<CustomerView />);
@@ -99,7 +104,7 @@ describe('the cross-app loop', () => {
   it('sends an offer, receives it in the app, and raises a hot lead back', async () => {
     const user = userEvent.setup();
     const { unmount } = console_(<CustomerView />);
-    await ready();
+    await workspaceReady();
 
     await user.click(screen.getByRole('button', { name: 'Send to customer app' }));
     expect(await screen.findByRole('button', { name: 'Offer sent to app' })).toBeInTheDocument();
@@ -120,7 +125,7 @@ describe('the cross-app loop', () => {
   it('shows the hot lead on the console queue after the customer taps through', async () => {
     const user = userEvent.setup();
     const first = console_(<CustomerView />);
-    await ready();
+    await workspaceReady();
     await user.click(screen.getByRole('button', { name: 'Send to customer app' }));
     await screen.findByRole('button', { name: 'Offer sent to app' });
     first.unmount();

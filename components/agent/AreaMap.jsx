@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { POPULATION_TYPES, USER_LOCATION } from '@/lib/data';
-import { opportunityBand } from '@/lib/ai';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { USER_LOCATION } from '@/lib/data';
+import { bestLine, growthProspect, PRODUCT_LINES } from '@/lib/ai';
 
 // ===========================================================================
 //  AREA MAP
@@ -35,18 +35,28 @@ const TILE_FAIL_LIMIT = 4;
 
 // Bounds of the schematic frame. Only used when tiles are unavailable.
 const BOUNDS = { minLat: 22.478, maxLat: 22.585, minLng: 88.348, maxLng: 88.446 };
-const OPPORTUNITY_FILL = ['#4a2020', '#8a1c1c', '#cc1616', '#ff2e2e'];
 
-export function zoneColour(loc, mode) {
-  return mode === 'population'
-    ? POPULATION_TYPES[loc.population]?.colour ?? '#6b7280'
-    : OPPORTUNITY_FILL[opportunityBand(loc).band];
+
+// One colour family per product line, four steps of intensity within it. The
+// family says which line you are looking at, the intensity says how good the
+// prospect is. Using one visual channel for both would collapse the two
+// questions into one answer.
+// Colour says which line this area is worth working. Size says how many
+// subscribers are in it. Two questions, two channels, and no tabs to switch
+// between, so the whole map answers both at once.
+//
+// A flat hue rather than a shade from the ramp, so a circle on the map and a
+// swatch in the legend are the same colour and the legend needs no explaining.
+export function zoneColour(loc) {
+  return PRODUCT_LINES[bestLine(loc).line].hue;
 }
 
 // Metres. Big enough to read as a designated area at this zoom rather than as
 // a dot, scaled by subscriber base so the biggest cluster is visibly bigger.
 export function zoneRadius(loc, max = 58200) {
-  return 620 + (loc.subscribers / max) * 1180;
+  // Spread widened so the difference between the smallest and largest cluster
+  // is obvious at a glance rather than something you have to measure.
+  return 460 + Math.pow(loc.subscribers / max, 1.25) * 1240;
 }
 
 function project(pt) {
@@ -61,14 +71,22 @@ function currentTheme() {
   return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
 }
 
-export default function AreaMap({ localities, mode, selectedId, onSelect }) {
+export default function AreaMap({ localities, selectedId, onSelect }) {
   const wantLive = process.env.NEXT_PUBLIC_LIVE_MAP !== 'false';
   const [live, setLive] = useState(false);
   const [failed, setFailed] = useState(!wantLive);
 
+  // These must be stable. Passing inline arrows put a new identity in the map
+  // effect's dependencies on every render, so the first tile load re-rendered
+  // this component, which tore the map down and rebuilt it, which dropped every
+  // layer on it. A rebuilt map with no boundaries on it looks exactly like a
+  // boundary that failed to draw.
+  const handleReady = useCallback(() => setLive(true), []);
+  const handleFail = useCallback(() => setFailed(true), []);
+
   if (failed || !wantLive) {
     return (
-      <SchematicMap localities={localities} mode={mode} selectedId={selectedId} onSelect={onSelect} live={false} />
+      <SchematicMap localities={localities} selectedId={selectedId} onSelect={onSelect} />
     );
   }
 
@@ -76,11 +94,10 @@ export default function AreaMap({ localities, mode, selectedId, onSelect }) {
     <>
       <LeafletMap
         localities={localities}
-        mode={mode}
         selectedId={selectedId}
         onSelect={onSelect}
-        onReady={() => setLive(true)}
-        onFail={() => setFailed(true)}
+        onReady={handleReady}
+        onFail={handleFail}
       />
       {!live && (
         <div className="geo-loading">
@@ -94,7 +111,7 @@ export default function AreaMap({ localities, mode, selectedId, onSelect }) {
 
 // --- live -------------------------------------------------------------------
 
-function LeafletMap({ localities, mode, selectedId, onSelect, onReady, onFail }) {
+function LeafletMap({ localities, selectedId, onSelect, onReady, onFail }) {
   const host = useRef(null);
   const map = useRef(null);
   const layers = useRef({ tiles: null, zones: [], me: null });
@@ -106,6 +123,9 @@ function LeafletMap({ localities, mode, selectedId, onSelect, onReady, onFail })
   // because none of its dependencies change after mount. The result is a
   // perfectly working basemap with nothing drawn on it.
   const [mapReady, setMapReady] = useState(false);
+  // Held in refs so the creation effect can run exactly once.
+  const cbs = useRef({ onReady, onFail });
+  cbs.current = { onReady, onFail };
 
   // Follow the app theme, so a light console does not get a dark basemap.
   useEffect(() => {
@@ -124,7 +144,7 @@ function LeafletMap({ localities, mode, selectedId, onSelect, onReady, onFail })
         L = (await import('leaflet')).default;
         await import('leaflet/dist/leaflet.css');
       } catch {
-        if (!cancelled) onFail();
+        if (!cancelled) cbs.current.onFail();
         return;
       }
       // React StrictMode mounts, unmounts and remounts effects in development.
@@ -148,10 +168,10 @@ function LeafletMap({ localities, mode, selectedId, onSelect, onReady, onFail })
         tileFails.current += 1;
         // A handful of misses is normal at the edge of the viewport. A wall of
         // them means the network is gone, and that is when we bail out.
-        if (tileFails.current >= TILE_FAIL_LIMIT && !cancelled) onFail();
+        if (tileFails.current >= TILE_FAIL_LIMIT && !cancelled) cbs.current.onFail();
       });
       tiles.on('load', () => {
-        if (!cancelled) onReady();
+        if (!cancelled) cbs.current.onReady();
       });
       tiles.addTo(m);
       layers.current.tiles = tiles;
@@ -168,7 +188,7 @@ function LeafletMap({ localities, mode, selectedId, onSelect, onReady, onFail })
 
       // Fires even if `load` never does, so the spinner cannot hang forever.
       const settle = setTimeout(() => {
-        if (!cancelled) onReady();
+        if (!cancelled) cbs.current.onReady();
       }, 2500);
 
       cleanup = () => {
@@ -188,14 +208,14 @@ function LeafletMap({ localities, mode, selectedId, onSelect, onReady, onFail })
       cancelled = true;
       cleanup();
     };
-  }, [onFail, onReady]);
+  }, []);
 
   // Swap the basemap when the theme changes, without rebuilding the map.
   useEffect(() => {
     if (layers.current.tiles) layers.current.tiles.setUrl(TILES[theme]);
   }, [theme]);
 
-  // Zones and the live marker are redrawn whenever the data or mode changes.
+  // Zones and the live marker are redrawn whenever the data or selection changes.
   useEffect(() => {
     const m = map.current;
     if (!mapReady || !m) return undefined;
@@ -212,46 +232,42 @@ function LeafletMap({ localities, mode, selectedId, onSelect, onReady, onFail })
       const biggest = Math.max(...localities.map((l) => l.subscribers), 1);
 
       for (const loc of localities) {
-        const colour = zoneColour(loc, mode);
+        const colour = zoneColour(loc);
         const on = loc.id === selectedId;
+        const radius = zoneRadius(loc, biggest);
 
-        // A soft halo under each zone, so an area reads as a designated patch
-        // of the city rather than as a circle someone drew on it.
+        // A soft halo under each circle so it reads as an area rather than a
+        // dot with a stroke.
         const halo = L.circle([loc.lat, loc.lng], {
-          radius: zoneRadius(loc, biggest) * 1.5,
+          radius: radius * 1.45,
           stroke: false,
           fillColor: colour,
-          fillOpacity: on ? 0.18 : 0.09,
+          fillOpacity: on ? 0.2 : 0.1,
           interactive: false,
           className: 'geo-live-halo',
         }).addTo(m);
 
-        const circle = L.circle([loc.lat, loc.lng], {
-          radius: zoneRadius(loc, biggest),
+        const shape = L.circle([loc.lat, loc.lng], {
+          radius,
           color: colour,
           weight: on ? 3.5 : 2,
+          opacity: on ? 1 : 0.9,
+          dashArray: on ? null : '6 4',
           fillColor: colour,
-          fillOpacity: on ? 0.55 : 0.28,
+          fillOpacity: on ? 0.45 : 0.22,
           className: 'geo-live-zone',
         }).addTo(m);
 
         // Labelled permanently. Six areas is few enough that naming them all
         // beats making someone hover to find out what they are looking at.
-        circle.bindTooltip(
-          `<b>${loc.name}</b><span>${
-            mode === 'population'
-              ? POPULATION_TYPES[loc.population]?.label ?? ''
-              : opportunityBand(loc).label
+        shape.bindTooltip(
+          `<b>${loc.name}</b><span>${PRODUCT_LINES[bestLine(loc).line].label} · ${
+            bestLine(loc).score
           }</span>`,
-          {
-            direction: 'top',
-            offset: [0, -6],
-            className: `geo-tip${on ? ' is-on' : ''}`,
-            permanent: true,
-          }
+          { direction: 'center', offset: [0, 0], className: `geo-tip${on ? ' is-on' : ''}`, permanent: true }
         );
-        circle.on('click', () => onSelect(loc.id));
-        layers.current.zones.push(halo, circle);
+        shape.on('click', () => onSelect(loc.id));
+        layers.current.zones.push(halo, shape);
       }
 
       layers.current.me = L.marker([USER_LOCATION.lat, USER_LOCATION.lng], {
@@ -275,7 +291,7 @@ function LeafletMap({ localities, mode, selectedId, onSelect, onReady, onFail })
         const bounds = L.latLngBounds([
           ...localities.map((l) => [l.lat, l.lng]),
           [USER_LOCATION.lat, USER_LOCATION.lng],
-        ]).pad(0.18);
+        ]).pad(0.22);
         // Not animated. The frame is set once on load, so the animation buys
         // nothing and its transition-end callback is the thing that crashes if
         // the map is torn down while it is running.
@@ -287,19 +303,19 @@ function LeafletMap({ localities, mode, selectedId, onSelect, onReady, onFail })
     return () => {
       cancelled = true;
     };
-  }, [localities, mode, selectedId, onSelect, mapReady]);
+  }, [localities, selectedId, onSelect, mapReady]);
 
   return <div className="geo-canvas geo-live" ref={host} />;
 }
 
 // --- fallback ---------------------------------------------------------------
 
-export function SchematicMap({ localities, mode, selectedId, onSelect }) {
+export function SchematicMap({ localities, selectedId, onSelect }) {
   const me = project(USER_LOCATION);
 
   return (
     <div className="geo-canvas">
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="geo-svg" aria-hidden="true">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="geo-svg">
         {[...Array(11)].map((_, i) => (
           <line key={`v${i}`} x1={i * 10} y1="0" x2={i * 10} y2="100" className="geo-grid" />
         ))}
@@ -308,6 +324,27 @@ export function SchematicMap({ localities, mode, selectedId, onSelect }) {
         ))}
         {/* The Bypass, which is the spine every one of these clusters hangs off */}
         <path d="M64 -4 C 58 20, 52 40, 47 58 C 42 76, 34 90, 28 104" className="geo-river" />
+
+        {/* The same circles the live map draws, projected into the frame.
+            Both read zoneColour and zoneRadius, so they cannot disagree. */}
+        {localities.map((l) => {
+          const p = project(l);
+          const biggest = Math.max(...localities.map((x) => x.subscribers), 1);
+          // Metres to frame units. The frame spans roughly 11 km across.
+          const r = (zoneRadius(l, biggest) / 1000 / 11) * 100;
+          return (
+            <circle
+              key={l.id}
+              cx={p.x}
+              cy={p.y}
+              r={r}
+              className="geo-shape"
+              data-on={l.id === selectedId}
+              style={{ '--zone': zoneColour(l) }}
+              onClick={() => onSelect(l.id)}
+            />
+          );
+        })}
       </svg>
 
       {localities.map((l) => {
@@ -318,23 +355,15 @@ export function SchematicMap({ localities, mode, selectedId, onSelect }) {
             key={l.id}
             className="geo-zone"
             data-on={on}
-            style={{
-              left: `${x}%`,
-              top: `${y}%`,
-              '--zone': zoneColour(l, mode),
-              '--size': `${34 + (l.subscribers / 63800) * 40}px`,
-            }}
+            style={{ left: `${x}%`, top: `${y}%`, '--zone': zoneColour(l) }}
             onClick={() => onSelect(l.id)}
             aria-label={`Select ${l.name}`}
             aria-pressed={on}
           >
-            <i />
             <span>
               <b>{l.name}</b>
               <small>
-                {mode === 'population'
-                  ? POPULATION_TYPES[l.population]?.label
-                  : opportunityBand(l).label}
+                {PRODUCT_LINES[bestLine(l).line].label} · {bestLine(l).score}
               </small>
             </span>
           </button>

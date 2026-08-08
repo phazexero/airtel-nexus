@@ -58,9 +58,15 @@ global.fetch = vi.fn(async (url) => {
   return { ok: true, status: 200, json: async () => ({}) };
 });
 
-beforeEach(() => {
+beforeEach(async () => {
   window.localStorage.clear();
   globalThis.__SEED_FAILS__ = false;
+  // The data and console stores are singletons on globalThis by design, so each
+  // test has to start from a fresh one.
+  const db = await import('@/lib/db');
+  const con = await import('@/lib/console');
+  db.__resetStore();
+  con.__resetConsole();
 });
 
 // Fail any test that logs a React error or warning. This is what catches

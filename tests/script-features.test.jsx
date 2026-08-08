@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DbProvider } from '@/lib/db';
 import CustomerSurface from '@/components/customer/CustomerSurface';
@@ -118,11 +118,15 @@ describe('distributor portal', () => {
 
   it('names the Black bundle as the recommended offer for this household', async () => {
     render(<DbProvider><CareChrome><CustomerView /></CareChrome></DbProvider>);
-    await screen.findByText(/conversations open/, {}, { timeout: 4000 });
+    await screen.findByRole('heading', { name: 'Sanyam Gupta' }, { timeout: 4000 });
     // The stage sits inside the panel's label, so match on the container text.
-    const tag = [...document.querySelectorAll('.ai-tag')].find((e) =>
-      e.textContent.includes('Next best action')
-    );
+    const tag = await waitFor(() => {
+      const el = [...document.querySelectorAll('.ai-tag')].find((e) =>
+        e.textContent.includes('Next best action')
+      );
+      expect(el).toBeTruthy();
+      return el;
+    });
     expect(tag.textContent).toContain('Ready for Black bundle');
   });
 });

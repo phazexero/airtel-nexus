@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { DATA_VERSION } from './data';
 
 // ===========================================================================
@@ -8,19 +8,31 @@ import { DATA_VERSION } from './data';
 //
 //  One store behind both apps. It loads asynchronously from /api/data so the
 //  loading states in the UI are real rather than decorative, then persists to
-//  localStorage and broadcasts every change to other open tabs. Open the care
+//  localStorage and broadcasts every change to other open tabs. Open the
 //  console in one tab and the customer app in another and they stay in step.
 //
-//  For a real deployment this is the layer that gets replaced: swap the
-//  localStorage read and write in load() and persist() for API calls against a
-//  database. Every component reads through useDb(), so nothing above this file
-//  needs to change.
+//  THIS DELIBERATELY DOES NOT USE REACT CONTEXT.
+//
+//  A React context is identified by object reference, and a bundler is free to
+//  place the same module in more than one chunk. When that happens the provider
+//  publishes on one context object while consumers read from another, and every
+//  screen dies with "must be used inside a provider" while sitting plainly
+//  inside one. It is not fixable by moving the provider, because the two copies
+//  were never going to meet.
+//
+//  So the store is a plain external store held on globalThis under a shared
+//  symbol, read through useSyncExternalStore. Two copies of this module resolve
+//  to the same store, the provider becomes optional rather than required, and
+//  there is no code path left that can throw for want of one.
+//
+//  For a real deployment this is still the layer to replace: swap the
+//  localStorage read and write for API calls. Every component reads through
+//  useDb(), so nothing above this file needs to change.
 // ===========================================================================
 
 const KEY = 'nexus.state.v2';
 const CHANNEL = 'nexus.sync';
-
-const DbContext = createContext(null);
+const STORE = Symbol.for('altcare.db.store');
 
 const empty = {
   status: 'loading', // loading | ready | error
@@ -43,9 +55,6 @@ const empty = {
   seq: 1,
 };
 
-// A cache written by an older build can be missing whole collections. Spreading
-// that over the empty state leaves an app that renders an empty queue forever
-// with no error to explain it, so check the shape before trusting it.
 // Reading storage is its own failure domain. Safari private mode and blocked
 // third-party storage both make this throw, and losing persistence must not
 // take the whole app down with it.
@@ -267,80 +276,92 @@ function reducer(state, action) {
   }
 }
 
-export function DbProvider({ children }) {
-  const [state, rawDispatch] = useReducer(reducer, empty);
-  const channel = useRef(null);
-  const echo = useRef(false);
+// --- the store -------------------------------------------------------------
 
-  // --- load -----------------------------------------------------------------
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const cached = typeof window !== 'undefined' ? readCache() : null;
-        if (cached) {
-          let parsed = null;
-          try {
-            parsed = JSON.parse(cached);
-          } catch {
-            parsed = null;
-          }
-          if (usable(parsed)) {
-            // Small delay even on the cached path so the skeletons are visible
-            // rather than flashing. Drop this when the data source is real.
-            await new Promise((r) => setTimeout(r, 260));
-            if (!cancelled) rawDispatch({ type: 'HYDRATE', payload: parsed });
-            return;
-          }
-          // Unreadable or written by an older build. Drop it and reseed.
-          try {
-            window.localStorage.removeItem(KEY);
-          } catch {
-            /* nothing to do */
-          }
-        }
-        const res = await fetch('/api/data');
-        if (!res.ok) throw new Error(`seed failed: ${res.status}`);
-        const seed = await res.json();
-        if (!cancelled) rawDispatch({ type: 'HYDRATE', payload: seed });
-      } catch (err) {
-        console.error(err);
-        if (!cancelled) rawDispatch({ type: 'FAILED' });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+function createStore() {
+  let state = empty;
+  const listeners = new Set();
+  let channel = null;
+  let echo = false;
+  let started = false;
 
-  // --- persist and broadcast ------------------------------------------------
-  useEffect(() => {
+  const emit = () => listeners.forEach((fn) => fn());
+
+  function set(next) {
+    if (next === state) return;
+    state = next;
+    persist();
+    emit();
+  }
+
+  function persist() {
     if (state.status !== 'ready') return;
-    const { status: _drop, ...persistable } = state;
+    const { status: _drop, ...body } = state;
     try {
-      window.localStorage.setItem(KEY, JSON.stringify(persistable));
+      window.localStorage.setItem(KEY, JSON.stringify(body));
     } catch {
-      /* storage full or blocked; the session still works, it just will not survive a reload */
+      /* storage blocked; the session still works, it just will not survive a reload */
     }
-    if (echo.current) {
-      echo.current = false;
+    if (echo) {
+      echo = false;
       return;
     }
-    channel.current?.postMessage(persistable);
-  }, [state]);
+    channel?.postMessage(body);
+  }
 
-  useEffect(() => {
-    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return undefined;
-    const ch = new BroadcastChannel(CHANNEL);
-    channel.current = ch;
-    ch.onmessage = (e) => {
-      echo.current = true;
-      rawDispatch({ type: 'HYDRATE', payload: e.data });
-    };
-    return () => ch.close();
-  }, []);
+  function dispatch(action) {
+    set(reducer(state, action));
+  }
 
-  const reset = useCallback(async () => {
+  async function load() {
+    try {
+      const cached = readCache();
+      if (cached) {
+        let parsed = null;
+        try {
+          parsed = JSON.parse(cached);
+        } catch {
+          parsed = null;
+        }
+        if (usable(parsed)) {
+          // A beat even on the cached path, so the skeletons are visible rather
+          // than flashing. Drop this when the data source is real.
+          await new Promise((r) => setTimeout(r, 260));
+          set(reducer(state, { type: 'HYDRATE', payload: parsed }));
+          return;
+        }
+        try {
+          window.localStorage.removeItem(KEY);
+        } catch {
+          /* nothing to do */
+        }
+      }
+      const res = await fetch('/api/data');
+      if (!res.ok) throw new Error(`seed failed: ${res.status}`);
+      set(reducer(state, { type: 'HYDRATE', payload: await res.json() }));
+    } catch (err) {
+      console.error('[data] could not load the working set', err);
+      set(reducer(state, { type: 'FAILED' }));
+    }
+  }
+
+  // Called by every consumer. Runs once however many components ask, so the
+  // provider is a convenience rather than a requirement.
+  function start() {
+    if (started || typeof window === 'undefined') return;
+    started = true;
+
+    if ('BroadcastChannel' in window) {
+      channel = new BroadcastChannel(CHANNEL);
+      channel.onmessage = (e) => {
+        echo = true;
+        set(reducer(state, { type: 'HYDRATE', payload: e.data }));
+      };
+    }
+    load();
+  }
+
+  async function reset() {
     try {
       window.localStorage.removeItem(KEY);
     } catch {
@@ -350,27 +371,60 @@ export function DbProvider({ children }) {
       const res = await fetch('/api/data');
       if (!res.ok) throw new Error(`reseed failed: ${res.status}`);
       const seed = await res.json();
-      rawDispatch({ type: 'HYDRATE', payload: seed });
-      channel.current?.postMessage(seed);
+      set(reducer(state, { type: 'HYDRATE', payload: seed }));
+      channel?.postMessage(seed);
     } catch {
-      // Reset is a user action, so a failure here has to surface rather than
-      // leave the console showing data the user believes they cleared.
-      rawDispatch({ type: 'FAILED' });
+      // Reset is a user action, so a failure has to surface rather than leave
+      // the console showing data the user believes they cleared.
+      set(reducer(state, { type: 'FAILED' }));
     }
+  }
+
+  return {
+    getState: () => state,
+    getServerState: () => empty,
+    subscribe(fn) {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+    dispatch,
+    reset,
+    start,
+  };
+}
+
+function store() {
+  if (!globalThis[STORE]) globalThis[STORE] = createStore();
+  return globalThis[STORE];
+}
+
+// Kept as a component because the root layout mounts it, and because it is the
+// obvious place to start loading. Nothing requires it: a consumer rendered
+// without it starts the store itself.
+export function DbProvider({ children }) {
+  useEffect(() => {
+    store().start();
   }, []);
-
-  const value = useMemo(
-    () => ({ state, dispatch: rawDispatch, reset, ready: state.status === 'ready' }),
-    [state, reset]
-  );
-
-  return <DbContext.Provider value={value}>{children}</DbContext.Provider>;
+  return children;
 }
 
 export function useDb() {
-  const ctx = useContext(DbContext);
-  if (!ctx) throw new Error('useDb must be used inside DbProvider');
-  return ctx;
+  const s = store();
+  const state = useSyncExternalStore(s.subscribe, s.getState, s.getServerState);
+
+  useEffect(() => {
+    s.start();
+  }, [s]);
+
+  return useMemo(
+    () => ({ state, dispatch: s.dispatch, reset: s.reset, ready: state.status === 'ready' }),
+    [state, s]
+  );
+}
+
+// Test seam. Clears the singleton so each test starts from nothing.
+export function __resetStore() {
+  delete globalThis[STORE];
 }
 
 // Convenience selectors so components do not re-implement lookups.

@@ -1,4 +1,3 @@
-import { DbProvider } from '@/lib/db';
 import CareChrome from '@/components/agent/CareChrome';
 
 export const metadata = {
@@ -7,9 +6,6 @@ export const metadata = {
 };
 
 export default function CareLayout({ children }) {
-  return (
-    <DbProvider>
-      <CareChrome>{children}</CareChrome>
-    </DbProvider>
-  );
+  // Data comes from the provider in the root layout.
+  return <CareChrome>{children}</CareChrome>;
 }

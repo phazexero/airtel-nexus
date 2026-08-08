@@ -1,4 +1,5 @@
 import './globals.css';
+import { DbProvider } from '@/lib/db';
 
 export const metadata = {
   title: 'Airtel Nexus',
@@ -23,7 +24,15 @@ export default function RootLayout({ children }) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {/* The data provider lives here rather than in each app's layout.
+            Per-app providers meant every new route, error boundary and
+            not-found page was one oversight away from rendering a consumer
+            outside the provider, which throws and takes the screen down.
+            One provider at the root removes the whole class of mistake, and
+            the working set is warm by the time either app is opened. */}
+        <DbProvider>{children}</DbProvider>
+      </body>
     </html>
   );
 }

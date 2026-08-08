@@ -1,4 +1,3 @@
-import { DbProvider } from '@/lib/db';
 
 export const metadata = {
   title: 'Airtel One — your account',
@@ -6,5 +5,6 @@ export const metadata = {
 };
 
 export default function MyLayout({ children }) {
-  return <DbProvider>{children}</DbProvider>;
+  // Data comes from the provider in the root layout.
+  return children;
 }

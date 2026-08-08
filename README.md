@@ -126,8 +126,21 @@ npm test
   for every cluster, every one labelled, the owner marker placed. The map is built in an
   async effect, and a layer effect that runs before it exists produces a working basemap with
   nothing on it, which looks like a styling problem and is not one.
+- `tests/boundaries.test.jsx` — the geometry itself: valid coordinate pairs in [lat, lng]
+  order, no self-intersecting edges, consistent winding, each ring enclosing its own
+  centroid, sane area, no ring overlapping another, and the campus inside its own cluster.
 - `tests/campaign-map.test.jsx` — the population map, both colour modes, the live location
   marker, the three-line area summary and the AltAI suggestion box.
+- `tests/imports.test.jsx` — every named import checked against what its target actually
+  exports. This is what catches a half-applied update, where a component has been replaced
+  but a module it imports from has not. Nothing else in the suite sees it: the failing screen
+  throws at build time in the app, while the tests import those modules directly and find
+  them fine.
+- `tests/routes.test.jsx` — every screen assembled the way Next assembles it, layout wrapping
+  layout wrapping page. Rendering a page on its own cannot catch a provider missing from a
+  layout, because the test supplies its own. This is the file that catches
+  "useDb must be used inside DbProvider". It also covers context identity across a second
+  module evaluation, and the error boundaries.
 - `tests/layout.test.jsx` — grid structure. The console is the only grid container, and each
   feature contributes exactly the children its column count expects. A nested grid container
   is invisible on a laptop and obvious on a monitor, so it gets asserted rather than eyeballed.
@@ -327,9 +340,16 @@ The clusters, and why each one is there:
 | Santoshpur and Survey Park | 700075 | Value households | Annual pack |
 | Jodhpur Park and Dhakuria | 700068 | Retirees | Payments Bank deposit |
 
-Every cluster is drawn as a filled circle with a soft halo and a permanent label, sized in
-metres from its subscriber base. The view fits itself around all six plus the campus on
-first load, so nothing can end up off screen whatever the container turns out to be.
+Every cluster is drawn as a **circle**, sized in metres from its subscriber base and coloured
+by the product line it is the strongest prospect for. Circles rather than polygons on
+purpose: a hand-drawn polygon looks like an official ward boundary without being one, and
+that is a claim worth not making. A circle reads as "roughly here, roughly this big", which
+is what this data supports.
+
+There are no mode tabs. Colour answers which line, size answers how many subscribers, and the
+legend names the three colours, so the whole map answers both questions at once instead of
+making someone switch between them. Selecting a circle shows all three prospect scores with
+the strongest marked, which is the one giving that circle its colour.
 
 It is a real map. Tiles are CARTO basemaps over OpenStreetMap data, which need no API key
 and no billing, and the basemap follows the light or dark theme. Attribution is rendered on
@@ -344,11 +364,17 @@ different depending on which map is running.
 To skip live tiles entirely, set `NEXT_PUBLIC_LIVE_MAP=false`. Worth doing if you already
 know the connection is bad, since it avoids the loading beat.
 
-Two colour modes, toggled in the map header. **Population type** is categorical: each cluster
-carries the mix it is dominated by, one label per area, because a map that hedges every zone
-into "mixed" tells a distributor nothing. **Opportunity** is a single red ramp scored from
-fiber headroom, ARPU and churn risk. The two are encoded differently on purpose: one is a
-category and one is a quantity, and using the same visual language for both would be a lie.
+Three colour modes, one per product line: **Postpaid**, **Payments Bank**, **Broadband**.
+Each line has its own colour family and four steps of intensity within it. The family says
+which line you are looking at, the intensity says how good the prospect is; using one visual
+channel for both questions would collapse them into one answer.
+
+Each line is scored separately from headroom, value and a willingness proxy, so a cluster
+that is already saturated scores low however rich it is. That separation is the point.
+Jodhpur Park scores 92 for Payments Bank and 51 for Broadband, and a single blended
+opportunity number would have averaged that difference away. Selecting an area shows all
+three side by side with the best line named, because the line worth working is rarely the one
+you arrived to sell.
 
 The account owner's handset sits on the map as the only blue thing on screen, so it never
 competes with a population colour or an opportunity band. Its position is fixed in
@@ -365,6 +391,85 @@ of a cluster usually has several legitimate plays and is choosing between them, 
 over a single option reads as a black box. The first listed is the one the rules engine would
 have taken on its own, which keeps the default honest, and whichever is chosen carries into
 the generated brief and shows up in the derivation trace.
+
+## Checking a copy is complete
+
+```bash
+npm run check
+```
+
+Verifies every local import resolves and every named import exists in its target, across the
+whole project, in about a second. If files from two different versions have been mixed, this
+names them. Run it before anything else when a screen fails to build.
+
+## When something breaks
+
+Every level has an error boundary: `app/error.jsx`, one per app under `app/care` and
+`app/my`, and `app/global-error.jsx` for a failure that takes the root layout with it. Each
+shows the actual message with a retry that re-renders the section without reloading, plus a
+reload and a way back. A demo that white-screens is over; a demo that shows one broken panel
+with a working retry is recoverable in front of a room. `app/not-found.jsx` handles unknown
+addresses.
+
+**There is no React context anywhere in this app.**
+
+A context is identified by object reference, and a bundler is free to place the same module
+in more than one chunk. Turbopack does exactly that here: `DbProvider` ended up in one server
+chunk and `useDb` in another, each with its own copy of the module and therefore its own
+context object. Every screen then died with "must be used inside DbProvider" while sitting
+plainly inside one. No provider placement fixes that, because the two copies were never going
+to meet.
+
+So the data store and the console's session and edit state are plain external stores held on
+`globalThis` under shared symbols, read through `useSyncExternalStore`. Two copies of a module
+resolve to the same store, and the provider is a convenience rather than a requirement:
+`useDb()` starts the store itself if nothing has. There is no code path left that can throw
+for want of a provider.
+
+The console state matters as much as the data. With context, a chunk split there would not
+have thrown, which is worse: edit mode would have silently stopped working and the operator
+would have quietly reverted to the default, with nothing on screen to say why.
+
+**The data provider sits in the root layout**, not in each app's layout. Per-app providers
+meant every new route, error boundary and not-found page was one oversight away from
+rendering a consumer outside the provider, which throws and takes the screen down. One
+provider at the root removes the class of mistake, and the working set is warm by the time
+either app is opened. `tests/routes.test.jsx` derives its provider by walking the root
+layout's element tree, so it cannot supply a provider the app forgot, and it fails if an app
+layout adds a second one — two stores would mean an offer sent on one surface never arriving
+on the other.
+
+React contexts are also keyed on the global registry rather than held in module scope. A context
+is identified by object reference, so a module evaluated twice in one page, which is what
+Fast Refresh does on edit and what a stale `.next` directory does on start, leaves the
+provider publishing on one context while consumers read from another. The symptom is
+"must be used inside" thrown from a component that is plainly inside the provider.
+
+If you ever do see that message, the fix is almost always: stop the dev server, delete
+`.next`, start again. The error text says so.
+
+## Versions
+
+Next 14.2.35, React 18.3.1, Vitest 2.1.9, jsdom 26.1.0, Leaflet 1.9.4. Every version is pinned
+exactly, not with carets, so an incidental `npm install` cannot pull a major version in behind
+you.
+
+`engines` declares Node 18.18 or newer, and the dependency set is chosen to hold to that.
+Newer jsdom releases require Node 22.13 or above and drag in an `undici` that wants 20.18.1,
+which produces `EBADENGINE` warnings on a perfectly reasonable Node 22.14. jsdom 26 needs only
+Node 18, pulls no `undici` at all, and behaves identically for these tests. A dependency that
+narrows who can run the project is a poor trade for a version number.
+
+This is deliberately not the newest stack. Next 16 defaults to Turbopack in development, and
+Turbopack was splitting a shared module across two server chunks, which is what produced the
+"must be used inside DbProvider" failures. Next 14.2 uses webpack, is on the patched 14.2 line,
+and is the version this project has been demonstrated on. The dev overlay in Next 16 will call
+14.2 outdated; it is patched, and "pinned to the patched 14.2 line" is a perfectly good answer
+to a question about it.
+
+The store rewrite from that episode is kept. It removed React context from the application
+entirely in favour of external stores on `globalThis`, which behaves identically under webpack
+and removes a whole class of bundler-dependent failure. Nothing about it is tied to Next 16.
 
 ## Layout
 

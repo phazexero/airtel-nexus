@@ -1,38 +1,29 @@
 'use client';
 
-import { createContext, useContext, useState } from 'react';
 import Link from 'next/link';
 import { useDb } from '@/lib/db';
+import { useConsole } from '@/lib/console';
 import ThemeToggle from '@/lib/theme';
-import { OPERATORS, DEFAULT_OPERATOR } from '@/lib/operators';
+import { OPERATORS } from '@/lib/operators';
 
-const SessionContext = createContext(DEFAULT_OPERATOR);
+// The console's identity and edit mode live in lib/console.jsx as an external
+// store, not in React context. These two hooks stay exported from here because
+// every panel already imports them from this file, and because this is where
+// they conceptually belong.
 export function useSession() {
-  return useContext(SessionContext);
+  return useConsole().user;
 }
 
-// Edit mode lives at the chrome level so one toggle governs every panel below
-// it, rather than each card carrying its own switch.
-const EditContext = createContext({ editing: false, canEdit: false, setEditing: () => {} });
 export function useEdit() {
-  return useContext(EditContext);
+  const { editing, canEdit, setEditing } = useConsole();
+  return { editing, canEdit, setEditing };
 }
 
 export default function CareChrome({ children }) {
   const { reset, state } = useDb();
-  const [user, setUser] = useState(DEFAULT_OPERATOR);
-  const [editing, setEditing] = useState(false);
-  const canEdit = user.role === 'supervisor';
-
-  function switchOperator(id) {
-    const next = OPERATORS.find((o) => o.id === id) ?? DEFAULT_OPERATOR;
-    setUser(next);
-    if (next.role !== 'supervisor') setEditing(false);
-  }
+  const { user, canEdit, editing, setEditing, setOperator } = useConsole();
 
   return (
-    <SessionContext.Provider value={user}>
-      <EditContext.Provider value={{ editing: editing && canEdit, canEdit, setEditing }}>
         <div className="shell">
           <header className="topbar">
             <Link href="/care" className="brand">
@@ -55,7 +46,7 @@ export default function CareChrome({ children }) {
               {canEdit && (
                 <button
                   className={`btn ${editing ? 'primary' : ''}`}
-                  onClick={() => setEditing((v) => !v)}
+                  onClick={() => setEditing(!editing)}
                   disabled={state.status !== 'ready'}
                 >
                   {editing ? 'Done editing' : 'Edit data'}
@@ -78,7 +69,7 @@ export default function CareChrome({ children }) {
                     {canEdit ? '' : ' · read only'}
                   </small>
                 </span>
-                <select value={user.id} onChange={(e) => switchOperator(e.target.value)} aria-label="Working as">
+                <select value={user.id} onChange={(e) => setOperator(e.target.value)} aria-label="Working as">
                   {OPERATORS.map((o) => (
                     <option key={o.id} value={o.id}>
                       {o.name} · {o.role}
@@ -95,7 +86,5 @@ export default function CareChrome({ children }) {
 
           {children}
         </div>
-      </EditContext.Provider>
-    </SessionContext.Provider>
   );
 }

@@ -1630,7 +1630,8 @@ textarea.edit-input { line-height: 1.55; font-size: 12px; }
   padding: 14px 18px; border-bottom: 1px solid var(--d-line);
 }
 .geo-bar h3 { margin: 4px 0 0; font-size: 17px; font-weight: 780; letter-spacing: -0.035em; }
-.geo-mode { margin-left: auto; min-width: 260px; }
+.geo-hint { margin-left: auto; font-size: 11px; color: var(--d-text-3); text-align: right; }
+@media (max-width: 720px) { .geo-hint { margin-left: 0; text-align: left; } }
 
 .geo-canvas {
   position: relative; height: clamp(340px, 46vh, 520px);
@@ -1647,20 +1648,25 @@ textarea.edit-input { line-height: 1.55; font-size: 12px; }
   position: absolute; transform: translate(-50%, -50%); border: 0; background: transparent;
   padding: 0; display: grid; place-items: center; color: inherit;
 }
-.geo-zone i {
-  display: block; width: var(--size); height: var(--size); border-radius: 50%;
-  background: color-mix(in srgb, var(--zone) 34%, transparent);
-  border: 1.5px solid var(--zone);
-  transition: transform var(--mid), box-shadow var(--mid), background var(--mid);
+/* The circle in the fallback, drawn from the same colour and radius the live
+   map uses so the two cannot disagree. */
+.geo-shape {
+  fill: color-mix(in srgb, var(--zone) 22%, transparent);
+  stroke: var(--zone); stroke-width: 1.6; stroke-dasharray: 5 3;
+  cursor: pointer; vector-effect: non-scaling-stroke;
+  transition: fill var(--mid), stroke-width var(--mid);
 }
-.geo-zone:hover i { transform: scale(1.08); background: color-mix(in srgb, var(--zone) 52%, transparent); }
-.geo-zone[data-on='true'] i {
-  background: color-mix(in srgb, var(--zone) 68%, transparent);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16), 0 0 32px -4px var(--zone);
+.geo-shape:hover { fill: color-mix(in srgb, var(--zone) 34%, transparent); }
+.geo-shape[data-on='true'] {
+  fill: color-mix(in srgb, var(--zone) 46%, transparent);
+  stroke-width: 3; stroke-dasharray: none;
 }
+.geo-zone { pointer-events: none; }
 .geo-zone span {
-  position: absolute; top: calc(50% + calc(var(--size) / 2) + 7px); left: 50%;
-  transform: translateX(-50%); white-space: nowrap; text-align: center;
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%); white-space: nowrap; text-align: center;
+  background: rgba(11, 12, 15, 0.82); border-radius: 999px; padding: 4px 10px;
+  pointer-events: none;
 }
 .geo-zone b { display: block; font-size: 10.5px; font-weight: 700; color: #e8eaef; letter-spacing: -0.01em; }
 .geo-zone small { display: block; font-size: 9px; color: #8e97a6; margin-top: 1px; }
@@ -1692,7 +1698,7 @@ textarea.edit-input { line-height: 1.55; font-size: 12px; }
   padding: 12px 18px; border-top: 1px solid var(--d-line);
 }
 .geo-legend span { display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; color: var(--d-text-3); }
-.geo-legend i { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.geo-legend i { width: 11px; height: 11px; border-radius: 50%; flex: none; }
 
 /* --- the three-line area summary ----------------------------------------- */
 
@@ -1798,7 +1804,6 @@ textarea.edit-input { line-height: 1.55; font-size: 12px; }
 .geo-live-zone { transition: fill-opacity var(--fast), stroke-width var(--fast); }
 .geo-live-zone:hover { fill-opacity: 0.5; }
 
-.geo-live-halo { pointer-events: none; }
 .geo-live-zone { cursor: pointer; }
 
 /* Every area is labelled, permanently. Six is few enough that naming them all
@@ -1854,3 +1859,84 @@ textarea.edit-input { line-height: 1.55; font-size: 12px; }
   border-top: 1px solid var(--d-line);
 }
 .geo-loading .kyc-spinner { width: 16px; height: 16px; border-width: 2px; }
+
+/* ==========================================================================
+   GROWTH PROSPECTS
+   Three lines, read side by side. The point of showing all three at once is
+   that the best line for an area is rarely the one you arrived to sell.
+   ========================================================================== */
+
+.geo-legend { align-items: center; }
+.geo-legend em {
+  font-style: normal; font-size: 10.5px; font-weight: 700; color: var(--d-text-2);
+  letter-spacing: -0.01em; margin-right: 4px;
+}
+.geo-legend b {
+  font-weight: 400; font-size: 10px; color: var(--d-text-3);
+  margin-left: auto; padding-left: 12px;
+}
+
+.prospects { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--d-line); }
+.prospect + .prospect { margin-top: 3px; }
+.prospect {
+  display: grid; grid-template-columns: 96px 1fr 32px 62px; align-items: center; gap: 10px;
+  border: 1px solid transparent; border-radius: var(--r-xs); padding: 8px 9px;
+}
+/* The strongest line is marked, because that is the one giving the circle on
+   the map its colour. */
+.prospect[data-on='true'] { background: var(--d-hover); border-color: var(--d-line-2); }
+.prospect b { font-size: 12px; font-weight: 650; letter-spacing: -0.015em; }
+.prospect-bar {
+  display: block; height: 7px; border-radius: 999px; background: var(--d-hover-2); overflow: hidden;
+}
+.prospect-bar i { display: block; height: 100%; border-radius: 999px; transition: width 0.7s var(--ease); }
+.prospect em {
+  font-style: normal; font-size: 13px; font-weight: 750; text-align: right;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.03em;
+}
+.prospect small { font-size: 10.5px; color: var(--d-text-3); text-align: right; }
+.prospect-best {
+  margin: 12px 0 0; font-size: 11.5px; line-height: 1.6; color: var(--d-text-3);
+}
+.prospect-best b { color: var(--d-text); font-weight: 700; }
+
+@media (max-width: 620px) {
+  .prospect { grid-template-columns: 84px 1fr 30px; }
+  .prospect small { display: none; }
+}
+
+/* ==========================================================================
+   ERROR AND EMPTY STATES
+   A demo that white-screens is over. A demo that shows one broken panel with a
+   working retry is recoverable in front of a room.
+   ========================================================================== */
+
+.err {
+  min-height: 100vh; display: grid; place-items: center; padding: 48px 22px;
+  background: var(--d-bg); color: var(--d-text);
+  background-image: radial-gradient(620px 320px at 50% 0%, rgba(228, 0, 0, 0.16), transparent 72%);
+}
+.err-card {
+  max-width: 520px; width: 100%; text-align: center;
+  border: 1px solid var(--d-line); border-radius: var(--r-lg); padding: 34px 30px;
+  background: var(--d-raise); animation: rise 0.4s var(--ease) both;
+}
+.err-mark {
+  display: grid; place-items: center; width: 46px; height: 46px; margin: 0 auto 16px;
+  border-radius: 50%; background: var(--red); color: #fff; font-size: 22px; font-weight: 800;
+}
+.err-card h1 { margin: 0 0 10px; font-size: 22px; font-weight: 780; letter-spacing: -0.04em; }
+.err-card p { margin: 0 0 18px; font-size: 12.5px; line-height: 1.7; color: var(--d-text-3); }
+.err-detail {
+  margin: 0 0 18px; padding: 12px 14px; text-align: left;
+  background: var(--code-bg); border: 1px solid var(--d-line); border-radius: var(--r-xs);
+  font-family: var(--mono); font-size: 11px; line-height: 1.65; color: var(--d-text-2);
+  white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow: auto;
+}
+.err-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.err-actions .btn { background: var(--d-field); border-color: var(--d-line-2); color: var(--d-text); }
+.err-actions .btn:hover { background: var(--d-hover-2); }
+.err-actions .btn.primary { background: var(--red); border-color: var(--red); color: #fff; }
+.err-actions .btn.ghost { background: transparent; border-color: transparent; color: var(--d-text-3); }
+.err-actions a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+.err-digest { margin: 16px 0 0; font-size: 10.5px; color: var(--d-text-3); font-family: var(--mono); }

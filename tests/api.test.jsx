@@ -45,6 +45,16 @@ describe('/api/ai', () => {
     expect((await post({ task: 'nonsense' })).status).toBe(400);
   });
 
+  it('404s an unknown locality rather than throwing a 500', async () => {
+    // Areas get renamed. A stale id should get a clear answer and the list of
+    // real ones, not an unexplained server error.
+    const res = await post({ task: 'campaign', localityId: 'an-old-name' });
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error).toContain('an-old-name');
+    expect(body.known.length).toBeGreaterThan(0);
+  });
+
   it('400s a malformed body rather than crashing the route', async () => {
     expect((await post('{not json')).status).toBe(400);
   });
