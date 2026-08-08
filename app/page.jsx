@@ -9,8 +9,8 @@ export default function Landing() {
           <div className="brand">
             <span className="brand-mark" aria-hidden="true" />
             <span>
-              Nexus
-              <small>Airtel dual surface</small>
+              AltCare
+              <small>Altura dual surface</small>
             </span>
           </div>
           <ThemeToggle scope="landing" />
@@ -36,7 +36,7 @@ export default function Landing() {
 
           <Link href="/my" className="door door-my">
             <span className="eyebrow">For customers</span>
-            <h2>Airtel One</h2>
+            <h2>AltCare</h2>
             <p>
               Recharge, plans, Payments Bank and the offers the console sends, on the account that
               sits first in the distributor queue.

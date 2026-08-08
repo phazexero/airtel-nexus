@@ -2,7 +2,7 @@ import './globals.css';
 import { DbProvider } from '@/lib/db';
 
 export const metadata = {
-  title: 'Airtel Nexus',
+  title: 'Altura Altcare',
   description:
     'Two independent apps sharing one data layer: the Airtel customer app and the care console behind it.',
 };

@@ -9,7 +9,7 @@ Two independent applications sharing one data layer.
   - `/care/customer` — queue, customer 360, next best action
   - `/care/campaigns` — geocentric campaign studio
   - `/care/performance` — what the features are meant to move
-- **Airtel One** at `/my` — the customer app. Recharge, plans, Payments Bank, offers,
+- **AltCare** at `/my` — the customer app. Recharge, plans, Payments Bank, offers,
   in-app onboarding.
 
 They open straight into the product. They share state, so an offer sent from the console
@@ -39,7 +39,7 @@ state.
 ## The demo path
 
 1. Open **AltCare** in one tab. You land on the feature hub, working as the supervisor.
-2. Open **Airtel One** in a second tab.
+2. Open **AltCare** in a second tab.
 3. Open **Customer** from the hub, pick Sanyam Gupta, and send the recommended offer.
 4. Watch it land in the other tab, with no refresh. Tap "Tell me more".
 5. Back on the console, a hot lead is now sitting above the queue.
@@ -169,11 +169,11 @@ No environment variables are required.
 Nothing calls a model today. The demo runs on a transparent rules engine so it works
 offline and gives the same answer twice, which is what you want when presenting.
 
-| File | What to change |
-| --- | --- |
-| `app/api/ai/route.js` | Fill in `callModel()`. The request and response contract is documented at the top. |
-| `lib/ai.js` | Flip `USE_REMOTE_MODEL` and uncomment the fetch inside `nextBestAction()` and `buildCampaign()`. |
-| `lib/db.jsx` | Replace the `localStorage` read and write with API calls when a database goes in. |
+| File                  | What to change                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------ |
+| `app/api/ai/route.js` | Fill in `callModel()`. The request and response contract is documented at the top.               |
+| `lib/ai.js`           | Flip `USE_REMOTE_MODEL` and uncomment the fetch inside `nextBestAction()` and `buildCampaign()`. |
+| `lib/db.jsx`          | Replace the `localStorage` read and write with API calls when a database goes in.                |
 
 One design decision worth keeping: **the model writes the wording, the rules choose the
 offer.** The product recommendation stays rule-derived so it is auditable and a bad
@@ -228,8 +228,8 @@ order, because an offer only makes sense once the number behind it is on screen.
    `components/customer/KycFlow.jsx`. The awkward part of KYC is not the camera, it is what
    happens when an image fails, which is why the retake path is built rather than implied.
 3. **Bundle the whole household** — opens the Family section.
-4. **Get a broadband connection** — raises a request and says so plainly: *We have raised a
-   request for this to customer support*, with a reference and a timestamp. It does not
+4. **Get a broadband connection** — raises a request and says so plainly: _We have raised a
+   request for this to customer support_, with a reference and a timestamp. It does not
    pretend to provision anything, because that is not what this path does.
 
 ## One account
@@ -331,14 +331,14 @@ place the centre is set, so moving the demo to another campus is a two-line chan
 
 The clusters, and why each one is there:
 
-| Cluster | Pin | Population | Play |
-| --- | --- | --- | --- |
-| Madurdaha and Chowbaga | 700107 | Students | Shared-flat fiber |
-| Ruby and Kasba | 700078 | Traders and SMB | Merchant collect |
-| Salt Lake Sector V | 700091 | IT workforce | Black bundle |
-| Ballygunge | 700019 | Affluent families | Black bundle |
-| Santoshpur and Survey Park | 700075 | Value households | Annual pack |
-| Jodhpur Park and Dhakuria | 700068 | Retirees | Payments Bank deposit |
+| Cluster                    | Pin    | Population        | Play                  |
+| -------------------------- | ------ | ----------------- | --------------------- |
+| Madurdaha and Chowbaga     | 700107 | Students          | Shared-flat fiber     |
+| Ruby and Kasba             | 700078 | Traders and SMB   | Merchant collect      |
+| Salt Lake Sector V         | 700091 | IT workforce      | Black bundle          |
+| Ballygunge                 | 700019 | Affluent families | Black bundle          |
+| Santoshpur and Survey Park | 700075 | Value households  | Annual pack           |
+| Jodhpur Park and Dhakuria  | 700068 | Retirees          | Payments Bank deposit |
 
 Every cluster is drawn as a **circle**, sized in metres from its subscriber base and coloured
 by the product line it is the strongest prospect for. Circles rather than polygons on

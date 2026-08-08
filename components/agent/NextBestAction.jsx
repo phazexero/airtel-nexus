@@ -102,8 +102,8 @@ export default function NextBestAction({ customer, decision }) {
         {alreadySent && (
           <p style={{ fontSize: 11.5, color: 'var(--d-text-3)', margin: '13px 0 0', lineHeight: 1.6 }}>
             {isAppUser
-              ? 'Open Airtel One in another tab to see it arrive. Anything the customer taps comes back to this queue as a hot lead.'
-              : 'Delivered. Only Sanyam Gupta has an Airtel One account in this demo, so the return journey is visible on his profile.'}
+              ? 'Open AltCare in another tab to see it arrive. Anything the customer taps comes back to this queue as a hot lead.'
+              : 'Delivered. Only Sanyam Gupta has an AltCare account in this demo, so the return journey is visible on his profile.'}
           </p>
         )}
       </div>

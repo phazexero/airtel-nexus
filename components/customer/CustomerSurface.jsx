@@ -15,7 +15,7 @@ export default function CustomerSurface() {
         <Link href="/" className="brand">
           <span className="brand-mark" aria-hidden="true" />
           <span>
-            Airtel One
+            AltCare
             <small>Your account</small>
           </span>
         </Link>

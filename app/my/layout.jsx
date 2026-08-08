@@ -1,6 +1,6 @@
 
 export const metadata = {
-  title: 'Airtel One — your account',
+  title: 'AltCare — your account',
   description: 'Recharge, plans, Payments Bank and offers picked for you.',
 };
 
