@@ -25,7 +25,7 @@ export default function Landing() {
         <div className="landing-grid">
           <Link href="/care" className="door door-care">
             <span className="eyebrow">For distributors</span>
-            <h2>AltCare</h2>
+            <h2>AltCare Console</h2>
             <p>
               The five-stage distributor journey, the queue, customer 360, next best action and the
               geocentric campaign studio. Supervisors can edit the underlying data and watch every
@@ -36,7 +36,7 @@ export default function Landing() {
 
           <Link href="/my" className="door door-my">
             <span className="eyebrow">For customers</span>
-            <h2>AltCare</h2>
+            <h2>AltCare Mobile</h2>
             <p>
               Recharge, plans, Payments Bank and the offers the console sends, on the account that
               sits first in the distributor queue.
