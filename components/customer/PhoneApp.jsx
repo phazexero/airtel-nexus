@@ -30,7 +30,7 @@ export default function PhoneApp({ tab, setTab }) {
     <div className="phone">
       <div className="phone-status">
         <span className="mono">9:41</span>
-        <span>Airtel 5G · 84%</span>
+        <span>Altura 5G · 84%</span>
       </div>
 
       <div className="phone-body">

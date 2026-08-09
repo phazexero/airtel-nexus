@@ -36,7 +36,8 @@ export default function NbaPush() {
         <span className="nba-icon" aria-hidden="true">✓</span>
         <div className="nba-body">
           <b>Unlimited Fiber is on</b>
-          <p>No data cap, no top-ups. It applies from today and shows on your next bill.</p>
+          <p>Your fiber connection has been requested. An associate will come to your location to install it.</p>
+          <p>After that, no data cap, no top-ups. Applies from Installation date and shows on your next bill.</p>
         </div>
       </div>
     );

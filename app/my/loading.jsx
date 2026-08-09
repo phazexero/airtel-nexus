@@ -7,7 +7,7 @@ export default function MyLoading() {
         <div className="phone">
           <div className="phone-status">
             <span className="mono">9:41</span>
-            <span>Airtel 5G</span>
+            <span>Altura 5G</span>
           </div>
           <div className="phone-body">
             <div className="app-header">
